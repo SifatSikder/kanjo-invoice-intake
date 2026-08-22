@@ -130,6 +130,9 @@ Report supplier_registration_no from the 登録番号 near the supplier's name.
 LINE ITEMS (品名・摘要)
 - One entry per printed row, in printed order.
 - 数量 = quantity, 単位 = unit, 単価 = unit price, 金額 = amount, 税率 = tax rate.
+- The 単位 column is easy to miss because it is narrow. Read it for every row and
+  copy it exactly: 個, 箱, 本, 袋, 件, 式, 時間, セット, kg, m. Return "" only when
+  that cell is genuinely blank.
 - Service and lump-sum rows often have 単位 "式" with no quantity or unit price.
   Return empty strings for those, not zeros.
 - Only fill tax_rate_raw when the row itself shows a rate in a 税率 column.
@@ -169,11 +172,14 @@ def build_messages(document: RenderedDocument) -> list[dict]:
     )
     if document.has_text_layer:
         header += (
-            "\nThis PDF has an embedded text layer, reproduced below. It is "
-            "character-exact, so PREFER IT for digits and identifiers; use the page "
-            "images to work out which column and row each value belongs to. If the "
-            "two ever disagree, trust the text layer for the characters and lower "
-            "your confidence for that field.\n"
+            "\nThis PDF has an embedded text layer, reproduced below. Use it to "
+            "confirm the exact characters of digits and identifiers, which is where "
+            "reading from pixels goes wrong.\n"
+            "IMPORTANT: the text layer can be INCOMPLETE. Some columns extract "
+            "badly and go missing from it entirely. It is corroboration, never an "
+            "authority that overrides the page. If a value is visible in the image "
+            "but absent from the text below, report what the image shows -- never "
+            "return an empty field just because the text layer lacks it.\n"
             f"\n--- BEGIN TEXT LAYER ---\n{document.text_layer}\n--- END TEXT LAYER ---\n"
         )
     else:

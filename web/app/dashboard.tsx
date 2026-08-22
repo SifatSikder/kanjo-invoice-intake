@@ -14,22 +14,22 @@ const GROUPS = [
   },
   {
     key: "BLOCKED",
-    title: "Blocked — cannot be registered",
+    title: "Can\u2019t be filed",
     blurb:
       "These need a decision no reviewer can make from this screen: an unknown supplier, or an invoice already in the ledger.",
   },
   {
     key: "NEEDS_REVIEW",
-    title: "Needs your review",
-    blurb: "A check failed, or policy requires a person. Open one to see exactly which.",
+    title: "Waiting on you",
+    blurb: "Open one to see what needs deciding.",
   },
-  { key: "EXTRACT_FAILED", title: "Could not be read", blurb: "Extraction failed on these." },
-  { key: "POST_FAILED", title: "Registration failed", blurb: "The accounting system refused these." },
+  { key: "EXTRACT_FAILED", title: "Couldn\u2019t be read", blurb: "These could not be opened or understood." },
+  { key: "POST_FAILED", title: "The accounting system refused these", blurb: "Open one to see what it objected to." },
   { key: "REJECTED", title: "Rejected", blurb: "Declined by a reviewer." },
   {
     key: "POSTED",
-    title: "Registered",
-    blurb: "Passed every check and went into the accounting system.",
+    title: "Filed",
+    blurb: "Checked and entered into the accounting system.",
   },
 ];
 
@@ -101,8 +101,8 @@ function Section({ title, blurb, rows }: { title: string; blurb: string; rows: S
             <th>Supplier</th>
             <th>Invoice no.</th>
             <th className="num">Total</th>
-            <th>Accounting ID</th>
-            <th>Reason</th>
+            <th>Reference</th>
+            <th>What&rsquo;s wrong</th>
           </tr>
         </thead>
         <tbody>
@@ -241,22 +241,22 @@ export function Dashboard({
           <div className="cards">
             <div className="card">
               <div className="n">{stats.auto_posted}</div>
-              <div className="l">Auto-registered</div>
+              <div className="l">Filed automatically</div>
               <div className="hint">Nobody had to look at these.</div>
             </div>
             <div className="card">
               <div className="n">{stats.needs_review}</div>
-              <div className="l">Needs review</div>
-              <div className="hint">A check failed or policy requires a person.</div>
+              <div className="l">Waiting on you</div>
+              <div className="hint">Something needs a person before these can be filed.</div>
             </div>
             <div className="card">
               <div className="n">{stats.blocked}</div>
-              <div className="l">Blocked</div>
-              <div className="hint">Cannot be registered at all.</div>
+              <div className="l">Can&rsquo;t be filed</div>
+              <div className="hint">These need a decision outside this screen.</div>
             </div>
             <div className="card">
               <div className="n">{pct}%</div>
-              <div className="l">Auto-pass rate</div>
+              <div className="l">Handled without you</div>
               <div className="hint">
                 The number that decides whether this pays for itself — review minutes,
                 not tokens, are the real cost.
@@ -264,7 +264,7 @@ export function Dashboard({
             </div>
             <div className="card">
               <div className="n">${stats.total_cost_usd.toFixed(4)}</div>
-              <div className="l">Extraction cost</div>
+              <div className="l">AI cost so far</div>
               <div className="hint">
                 {stats.total_documents
                   ? `$${(stats.total_cost_usd / stats.total_documents).toFixed(4)} per invoice · ${
@@ -275,7 +275,7 @@ export function Dashboard({
             </div>
             <div className="card">
               <div className="n">{stats.registered_in_accounting}</div>
-              <div className="l">In accounting</div>
+              <div className="l">In the accounting system</div>
               <div className="hint">
                 Read back live from <span className="mono">GET /invoices</span>.
               </div>

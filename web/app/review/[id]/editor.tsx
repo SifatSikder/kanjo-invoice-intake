@@ -3,19 +3,30 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { recompute, yen } from "@/lib/api";
+import { SEVERITY_LABEL, describe } from "@/lib/checks";
 import type { Check, Invoice, Line, Partner } from "@/lib/types";
 
 const SEVERITY_RANK: Record<string, number> = { BLOCKER: 0, ERROR: 1, WARN: 2, INFO: 3 };
 
-function CheckRow({ c }: { c: Check }) {
+// How we identified the supplier, said plainly.
+const MATCHED_BY: Record<string, string> = {
+  REGISTRATION_NO: " · identified by registration number",
+  EXACT_NAME: " · identified by name",
+  ALIAS: " · matched to a known alias of this supplier",
+  FUZZY_NAME: " · matched on a similar name only",
+  UNRESOLVED: "",
+};
+
+/** A problem, stated the way a person would state it. */
+function Problem({ c }: { c: Check }) {
+  const { title, action, detail } = describe(c);
   return (
-    <div className={`check ${c.passed ? "pass" : c.severity}`}>
-      <span className="tag">{c.passed ? "PASS" : c.severity}</span>
+    <div className={`check ${c.severity}`}>
+      <span className="tag">{SEVERITY_LABEL[c.severity]}</span>
       <div>
-        <strong className="mono" style={{ fontSize: 12 }}>
-          {c.name}
-        </strong>
-        <div>{c.message}</div>
+        <strong>{title}</strong>
+        <div className="detail">{detail}</div>
+        {action && <div className="action">{action}</div>}
       </div>
     </div>
   );
@@ -145,18 +156,12 @@ export function ReviewEditor({
 
         {failed.length > 0 && (
           <div className="panel">
-            <h2 style={{ marginTop: 0 }}>Why this stopped</h2>
+            <h2 style={{ marginTop: 0 }}>
+              {blockers.length > 0 ? "This invoice can't be registered" : "Before you approve"}
+            </h2>
             {failed.map((c) => (
-              <CheckRow key={c.name} c={c} />
+              <Problem key={c.name} c={c} />
             ))}
-            {blockers.length > 0 && (
-              <p className="note">
-                A <strong>blocker</strong> cannot be overridden here. Registering a duplicate
-                or an unknown supplier needs a decision outside this screen — add the
-                supplier to the master, or confirm with the issuer that this is a genuinely
-                new invoice.
-              </p>
-            )}
           </div>
         )}
 
@@ -183,7 +188,7 @@ export function ReviewEditor({
                 {invoice.partner_registration_no
                   ? ` · 登録番号 ${invoice.partner_registration_no}`
                   : ""}{" "}
-                · matched by {invoice.partner_match_method.toLowerCase().replace(/_/g, " ")}
+                {MATCHED_BY[invoice.partner_match_method] ?? ""}
               </div>
             </div>
           </div>
@@ -266,6 +271,7 @@ export function ReviewEditor({
                   <td style={{ width: 68 }}>
                     <input
                       value={l.unit}
+                      placeholder="not read"
                       disabled={isPosted}
                       onChange={(e) => updateLine(i, { unit: e.target.value })}
                     />
@@ -351,6 +357,12 @@ export function ReviewEditor({
                 onChange={(e) => setNote(e.target.value)}
               />
             </div>
+            {blockers.length > 0 && (
+              <p className="note">
+                This one can&rsquo;t be registered from here whatever you change — see above.
+                You can still reject it to take it off the queue.
+              </p>
+            )}
             <div className="actions" style={{ marginTop: 10 }}>
               <button
                 className="btn"
@@ -359,18 +371,15 @@ export function ReviewEditor({
               >
                 Save corrections
               </button>
-              <button
-                className="btn primary"
-                disabled={busy || blockers.length > 0}
-                title={
-                  blockers.length > 0
-                    ? "This invoice is blocked and cannot be registered"
-                    : undefined
-                }
-                onClick={() => send(`/api/invoices/${invoice.id}/approve`, "Approved")}
-              >
-                Approve &amp; register
-              </button>
+              {blockers.length === 0 && (
+                <button
+                  className="btn primary"
+                  disabled={busy}
+                  onClick={() => send(`/api/invoices/${invoice.id}/approve`, "Approved")}
+                >
+                  Approve &amp; register
+                </button>
+              )}
               <button
                 className="btn danger"
                 disabled={busy}
@@ -381,19 +390,33 @@ export function ReviewEditor({
             </div>
             {failed.some((c) => c.severity === "ERROR") && blockers.length === 0 && (
               <p className="note">
-                Approving overrides {failed.filter((c) => c.severity === "ERROR").length} failed
-                check(s). Your name and note are recorded against the decision.
+                Approving this accepts responsibility for the{" "}
+                {failed.filter((c) => c.severity === "ERROR").length} point(s) above. Your name
+                and note are stored with the decision.
               </p>
             )}
           </div>
         )}
 
-        <div className="panel">
-          <h2 style={{ marginTop: 0 }}>All checks ({passed.length} passed)</h2>
-          {passed.map((c) => (
-            <CheckRow key={c.name} c={c} />
-          ))}
-        </div>
+        {/* A clerk does not need twenty lines telling them nothing is wrong. One
+            line says it; the detail stays available for anyone auditing later. */}
+        <details className="panel checks-detail">
+          <summary>
+            <span className="ok-dot" aria-hidden />
+            {failed.length === 0
+              ? `All ${passed.length} checks passed`
+              : `${passed.length} other checks passed`}
+            <span className="reveal">show them</span>
+          </summary>
+          <ul className="passed-list">
+            {passed.map((c) => (
+              <li key={c.name}>
+                {describe(c).title}
+                <code>{c.name}</code>
+              </li>
+            ))}
+          </ul>
+        </details>
       </div>
     </div>
   );

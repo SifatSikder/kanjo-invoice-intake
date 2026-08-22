@@ -91,7 +91,6 @@ async def partners() -> dict:
 
 async def _run_ingest(folder: Path, auto_post: bool) -> None:
     async with _ingest_lock:
-        _ingest_state.update(running=True, last_error=None)
         try:
             async with SessionLocal() as session:
                 await ingest_folder(
@@ -110,9 +109,16 @@ async def _run_ingest(folder: Path, auto_post: bool) -> None:
 
 @router.post("/admin/ingest")
 async def trigger_ingest(background: BackgroundTasks, auto_post: bool = True) -> dict:
-    """Kick off a run. Ingest is idempotent, so calling this twice is harmless."""
+    """Kick off a bulk run over the invoice folder.
+
+    The running flag is set here rather than inside the background task. Setting
+    it in the task leaves a window between this check and the task actually
+    starting, and two clicks landing in that window both start a run -- which
+    then race each other's duplicate checks.
+    """
     if _ingest_state["running"]:
         return {"started": False, "reason": "an ingest is already running"}
+    _ingest_state.update(running=True, last_error=None)
     background.add_task(_run_ingest, Path(settings.invoice_dir), auto_post)
     return {"started": True, "folder": str(settings.invoice_dir)}
 

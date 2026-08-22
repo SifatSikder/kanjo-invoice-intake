@@ -20,12 +20,17 @@ from __future__ import annotations
 import base64
 import hashlib
 import io
+import logging
 import mimetypes
+import shutil
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import pypdfium2 as pdfium
 from PIL import Image, ImageOps
+
+logger = logging.getLogger(__name__)
 
 # Vision models gain nothing from more than ~1600px on the long edge for a
 # document page, and image tokens scale with area, so this is the main cost dial.
@@ -87,11 +92,35 @@ def _encode(image: Image.Image) -> tuple[bytes, str, int, int]:
     return buffer.getvalue(), "image/jpeg", image.width, image.height
 
 
+def _text_via_poppler(path: Path) -> str | None:
+    """Extract the text layer with poppler, preserving column alignment.
+
+    Preferred over pdfium's own extraction for two reasons. It keeps the table
+    columns lined up, which helps the model attribute a value to the right
+    column. And it proved more complete: pdfium's extraction silently dropped the
+    単位 column on the sample invoices in the Linux container -- the same file,
+    the same library version, extracted fine on macOS. A text layer that is
+    missing values is worse than none at all, because the model is told to trust
+    it.
+    """
+    if not shutil.which("pdftotext"):
+        return None
+    try:
+        result = subprocess.run(
+            ["pdftotext", "-layout", "-enc", "UTF-8", str(path), "-"],
+            capture_output=True, text=True, timeout=30, check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        logger.warning("pdftotext failed on %s: %s", path.name, exc)
+        return None
+    return result.stdout if result.returncode == 0 else None
+
+
 def _render_pdf(path: Path) -> tuple[list[RenderedPage], str, int]:
     pdf = pdfium.PdfDocument(str(path))
     try:
         pages: list[RenderedPage] = []
-        text_parts: list[str] = []
+        fallback_parts: list[str] = []
         for index, page in enumerate(pdf, start=1):
             # Scale so the long edge lands near MAX_EDGE_PX. PDF user units are
             # 1/72 inch, so scale 1.0 == 72 DPI.
@@ -100,10 +129,12 @@ def _render_pdf(path: Path) -> tuple[list[RenderedPage], str, int]:
             image = page.render(scale=scale).to_pil()
             data, media_type, width, height = _encode(image)
             pages.append(RenderedPage(index, data, media_type, width, height))
+            fallback_parts.append(page.get_textpage().get_text_bounded())
 
-            textpage = page.get_textpage()
-            text_parts.append(textpage.get_text_bounded())
-        return pages, "\n".join(text_parts), len(pages)
+        text = _text_via_poppler(path)
+        if text is None or len(text.strip()) < len("".join(fallback_parts).strip()):
+            text = "\n".join(fallback_parts)
+        return pages, text, len(pages)
     finally:
         pdf.close()
 

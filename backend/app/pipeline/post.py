@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clients.accounting import AccountingClient, ApiResult
 from app.models import Invoice, InvoiceStatus, Posting
-from app.pipeline.normalize import expected_tax_by_code
+from app.pipeline.normalize import FALLBACK_UNIT, expected_tax_by_code
 from app.schemas import AccountingLine, AccountingPayload
 
 logger = logging.getLogger(__name__)
@@ -58,7 +58,9 @@ def build_payload(invoice: Invoice) -> AccountingPayload:
             AccountingLine(
                 description=line.description,
                 quantity=line.quantity,
-                unit=line.unit,
+                # The API rejects an empty unit. Substituting here, at the
+                # boundary, keeps our own record honest about what was read.
+                unit=line.unit or FALLBACK_UNIT,
                 unit_price=line.unit_price,
                 amount=line.amount,
                 tax_code=line.tax_code,

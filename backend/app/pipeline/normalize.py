@@ -184,7 +184,15 @@ def expected_tax_by_code(lines) -> dict[str, int]:
     }
 
 
+# The accounting system rejects a line with no unit, so something has to be sent.
+# That substitution happens in post.build_payload, where it is an accommodation to
+# a downstream contract -- NOT here, where it would silently turn "the unit was
+# not read" into the positive claim "this line is a lump sum". A row printed as
+# "120 個" recorded as "120 式" is invented data, and because units take no part
+# in any arithmetic, no other check would ever catch it.
+FALLBACK_UNIT = "式"
+
+
 def normalize_unit(raw: str | None) -> str:
-    """The API requires a non-empty unit string; 式 ('lot') is the JP default."""
-    text = normalize_text(raw)
-    return text if text else "式"
+    """Return the unit as printed. Empty means it was not read, and stays empty."""
+    return normalize_text(raw)

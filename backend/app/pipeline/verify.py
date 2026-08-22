@@ -343,11 +343,16 @@ def run_checks(
     add(
         Check(
             "fields.units_present",
-            Severity.ERROR,
+            # A missing unit label does not change what is paid, so it does not
+            # block. It is surfaced because the accounting system requires one,
+            # and we will substitute a lump-sum marker rather than guess 個/箱/本.
+            Severity.WARN,
             not missing_units,
-            f"Lines {missing_units} have no unit; the accounting system requires one"
+            f"The unit column was not read on line(s) {', '.join(map(str, missing_units))}; "
+            f"they will be registered as '式' (lump sum)"
             if missing_units
             else "Every line has a unit",
+            {"lines": missing_units} if missing_units else None,
         )
     )
 

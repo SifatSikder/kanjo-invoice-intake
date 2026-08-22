@@ -139,3 +139,18 @@ def test_min_confidence_is_the_worst_field_not_the_average():
 def test_unreadable_dates_stay_none_so_the_check_can_object():
     inv = normalize_extraction(raw(lines=[line(amount="1")], issue_date_raw="", due_date_raw="?"))
     assert inv.issue_date is None and inv.due_date is None
+
+
+def test_a_unit_that_was_not_read_stays_empty():
+    """The model sometimes misses the narrow 単位 column entirely.
+
+    Filling it in with 式 ("lump sum") would turn "we did not read this" into the
+    positive claim "this line is a lump sum" -- and because units take part in no
+    arithmetic, no other check would ever catch the invention.
+    """
+    inv = normalize_extraction(raw(lines=[
+        line("精密部品A-100", qty="120", unit="", amount="150,000"),
+        line("梱包・輸送費", unit="式", amount="18,000"),
+    ]))
+    assert inv.lines[0].unit == ""      # not read -> stays not read
+    assert inv.lines[1].unit == "式"     # actually printed -> preserved
