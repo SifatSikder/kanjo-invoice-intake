@@ -1,0 +1,410 @@
+"""The pipeline state machine.
+
+    ingest -> render -> extract -> normalise -> resolve supplier -> dedupe
+           -> verify -> {auto-post | review queue | blocked}
+
+Two properties are worth calling out.
+
+Idempotent ingest: documents are keyed by SHA-256 of their bytes, so re-running
+the ingest over the same folder does nothing. The brief invites you to "retry as
+often as you like", and a pipeline that double-registers on a second run would
+be reproducing the client's original complaint.
+
+Nothing is posted that has not passed every check, or been approved by a named
+human whose decision is recorded in review_events.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from datetime import date, datetime
+from decimal import Decimal
+from enum import Enum
+from pathlib import Path
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.clients.accounting import AccountingClient
+from app.clients.openrouter import OpenRouterClient
+from app.config import Settings, settings as default_settings
+from app.models import (
+    CheckResult,
+    Document,
+    Extraction,
+    Invoice,
+    InvoiceLine,
+    InvoiceStatus,
+    MatchMethod,
+)
+from app.pipeline.dedupe import find_duplicates
+from app.pipeline.extract import PROMPT_VERSION, extract_document, normalize_extraction
+from app.pipeline.partners import PartnerMaster, PartnerMatch
+from app.pipeline.post import post_invoice
+from app.pipeline.render import prepare_document
+from app.pipeline.verify import VerificationResult, run_checks
+from app.schemas import NormalizedInvoice, NormalizedLine
+
+logger = logging.getLogger(__name__)
+
+SUPPORTED_SUFFIXES = {".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".webp"}
+
+_master_cache: PartnerMaster | None = None
+
+
+async def get_partner_master(client: AccountingClient, *, refresh: bool = False) -> PartnerMaster:
+    """The supplier master always comes from the accounting system, never a local copy."""
+    global _master_cache
+    if _master_cache is None or refresh:
+        _master_cache = PartnerMaster(await client.get_partners())
+        logger.info("loaded %s partners from the accounting system", len(_master_cache))
+    return _master_cache
+
+
+def _jsonable(value):
+    """Coerce a check detail into something JSONB will accept.
+
+    Check details are free-form diagnostic payloads assembled from database rows
+    and parsed values, so they legitimately contain dates and Decimals. Rather
+    than force every check to remember to stringify, normalise once here.
+    """
+    if isinstance(value, dict):
+        return {str(k): _jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_jsonable(v) for v in value]
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, Enum):
+        return value.value
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    return str(value)
+
+
+def _persist_verification(invoice: Invoice, result: VerificationResult) -> None:
+    invoice.checks.clear()
+    for check in result.checks:
+        invoice.checks.append(
+            CheckResult(
+                name=check.name,
+                severity=check.severity,
+                passed=check.passed,
+                message=check.message,
+                detail=_jsonable(check.detail),
+            )
+        )
+
+
+def _apply_normalized(invoice: Invoice, normalized: NormalizedInvoice, match) -> None:
+    invoice.partner_code = match.partner_code
+    invoice.partner_match_method = match.method
+    invoice.partner_confidence = match.confidence
+    invoice.partner_name_raw = normalized.supplier_name
+    invoice.partner_registration_no = normalized.supplier_registration_no
+    invoice.invoice_number = normalized.invoice_number
+    invoice.issue_date = normalized.issue_date
+    invoice.due_date = normalized.due_date
+    invoice.issue_date_raw = normalized.issue_date_raw
+    invoice.due_date_raw = normalized.due_date_raw
+    invoice.currency = normalized.currency
+    invoice.subtotal = normalized.subtotal
+    invoice.tax_amount = normalized.tax_amount
+    invoice.total_amount = normalized.total_amount
+    invoice.min_confidence = normalized.min_confidence
+    invoice.has_handwriting = normalized.has_handwriting
+
+    invoice.lines.clear()
+    for line in normalized.lines:
+        invoice.lines.append(
+            InvoiceLine(
+                seq=line.seq,
+                description=line.description,
+                quantity=line.quantity,
+                unit=line.unit,
+                unit_price=line.unit_price,
+                amount=line.amount,
+                tax_code=line.tax_code,
+                tax_rate_raw=line.tax_rate_raw,
+            )
+        )
+
+
+async def verify_invoice(
+    session: AsyncSession,
+    invoice: Invoice,
+    master: PartnerMaster,
+    *,
+    text_layer: str | None = None,
+    config: Settings | None = None,
+) -> VerificationResult:
+    """Re-run the full check ladder against whatever the invoice currently holds.
+
+    Used both on first pass and after a reviewer edits, so a human cannot save a
+    correction that the accounting system would reject.
+    """
+    config = config or default_settings
+    # Handwriting severity was decided at extraction time from what the model saw;
+    # a re-verify cannot re-read the page, so carry the earlier verdict forward.
+    affects_payment = any(
+        c.name == "handwriting.on_payment_details" and not c.passed for c in invoice.checks
+    )
+    handwriting_notes = next(
+        (c.message for c in invoice.checks if c.name == "handwriting.detected" and not c.passed),
+        "",
+    )
+
+    normalized = NormalizedInvoice(
+        supplier_name=invoice.partner_name_raw or "",
+        supplier_registration_no=invoice.partner_registration_no or "",
+        invoice_number=invoice.invoice_number or "",
+        issue_date=invoice.issue_date,
+        due_date=invoice.due_date,
+        issue_date_raw=invoice.issue_date_raw or "",
+        due_date_raw=invoice.due_date_raw or "",
+        subtotal=invoice.subtotal,
+        tax_amount=invoice.tax_amount,
+        total_amount=invoice.total_amount,
+        lines=[
+            NormalizedLine(
+                seq=line.seq, description=line.description, quantity=line.quantity,
+                unit=line.unit, unit_price=line.unit_price, amount=line.amount,
+                tax_code=line.tax_code, tax_rate_raw=line.tax_rate_raw,
+            )
+            for line in invoice.lines
+        ],
+        min_confidence=invoice.min_confidence,
+        has_handwriting=invoice.has_handwriting,
+        handwriting_affects_payment=affects_payment,
+        handwriting_notes=handwriting_notes,
+    )
+
+    match = master.resolve(
+        invoice.partner_name_raw, invoice.partner_registration_no,
+        fuzzy_threshold=config.fuzzy_partner_threshold,
+    )
+    # A reviewer may have chosen the partner by hand; respect that over matching.
+    if invoice.partner_code and match.partner_code != invoice.partner_code:
+        if master.get(invoice.partner_code):
+            match = PartnerMatch(
+                partner_code=invoice.partner_code,
+                method=MatchMethod.EXACT_NAME,
+                confidence=1.0,
+                detail={"source": "chosen by a reviewer"},
+            )
+
+    duplicates = await find_duplicates(
+        session,
+        partner_code=match.partner_code,
+        invoice_number=invoice.invoice_number,
+        total_amount=invoice.total_amount,
+        issue_date=invoice.issue_date,
+        exclude_invoice_id=invoice.id,
+        window_days=config.near_duplicate_window_days,
+    )
+
+    result = run_checks(
+        normalized, match,
+        duplicates=duplicates,
+        text_layer=text_layer,
+        confidence_floor=config.confidence_floor,
+        amount_review_threshold=config.amount_review_threshold_jpy,
+    )
+    invoice.partner_code = match.partner_code
+    invoice.partner_match_method = match.method
+    invoice.partner_confidence = match.confidence
+    _persist_verification(invoice, result)
+    return result
+
+
+async def process_document(
+    session: AsyncSession,
+    path: Path,
+    *,
+    openrouter: OpenRouterClient,
+    accounting: AccountingClient,
+    master: PartnerMaster,
+    config: Settings | None = None,
+    auto_post: bool | None = None,
+) -> Invoice | None:
+    """Ingest one file end to end. Returns None when it was already ingested."""
+    config = config or default_settings
+    auto_post = config.auto_post_enabled if auto_post is None else auto_post
+
+    rendered = prepare_document(path, storage_dir=config.storage_dir)
+
+    existing = await session.scalar(
+        select(Document).where(Document.sha256 == rendered.sha256)
+    )
+    if existing is not None:
+        logger.info("%s already ingested (sha256 %s); skipping", path.name, rendered.sha256[:12])
+        return None
+
+    document = Document(
+        filename=rendered.filename,
+        sha256=rendered.sha256,
+        mime_type=rendered.mime_type,
+        page_count=rendered.page_count,
+        storage_path=str(Path(config.storage_dir) / rendered.sha256),
+        has_text_layer=rendered.has_text_layer,
+    )
+    session.add(document)
+    await session.flush()
+
+    # Collections are initialised explicitly. Once the row is flushed it becomes
+    # persistent, and touching an unloaded collection would trigger a lazy load --
+    # which is synchronous IO, and raises MissingGreenlet under asyncio.
+    invoice = Invoice(
+        document_id=document.id, status=InvoiceStatus.PENDING,
+        lines=[], checks=[], postings=[], review_events=[],
+    )
+    session.add(invoice)
+    await session.flush()
+
+    # --- extraction ----------------------------------------------------------
+    try:
+        raw, completion = await extract_document(
+            openrouter, rendered, model=config.extraction_model
+        )
+    except Exception as exc:  # noqa: BLE001 - one bad document must not kill a batch
+        logger.exception("extraction failed for %s", path.name)
+        session.add(Extraction(
+            document_id=document.id, model=config.extraction_model,
+            prompt_version=PROMPT_VERSION, raw_response={}, error=str(exc),
+        ))
+        invoice.status = InvoiceStatus.EXTRACT_FAILED
+        invoice.notes = f"Extraction failed: {exc}"
+        await session.flush()
+        return invoice
+
+    normalized = normalize_extraction(raw)
+    extraction = Extraction(
+        document_id=document.id,
+        model=completion.model,
+        prompt_version=PROMPT_VERSION,
+        raw_response=raw.model_dump(),
+        normalized=normalized.model_dump(mode="json"),
+        prompt_tokens=completion.prompt_tokens,
+        completion_tokens=completion.completion_tokens,
+        cost_usd=completion.cost_usd,
+        latency_ms=completion.latency_ms,
+    )
+    session.add(extraction)
+    await session.flush()
+
+    invoice.extraction_id = extraction.id
+    invoice.status = InvoiceStatus.EXTRACTED
+
+    match = master.resolve(
+        normalized.supplier_name, normalized.supplier_registration_no,
+        fuzzy_threshold=config.fuzzy_partner_threshold,
+    )
+    _apply_normalized(invoice, normalized, match)
+    await session.flush()
+
+    # --- verification --------------------------------------------------------
+    duplicates = await find_duplicates(
+        session,
+        partner_code=match.partner_code,
+        invoice_number=normalized.invoice_number,
+        total_amount=normalized.total_amount,
+        issue_date=normalized.issue_date,
+        exclude_invoice_id=invoice.id,
+        window_days=config.near_duplicate_window_days,
+    )
+    result = run_checks(
+        normalized, match,
+        duplicates=duplicates,
+        text_layer=rendered.text_layer if rendered.has_text_layer else None,
+        confidence_floor=config.confidence_floor,
+        amount_review_threshold=config.amount_review_threshold_jpy,
+    )
+    _persist_verification(invoice, result)
+
+    disposition = result.disposition
+    if disposition is InvoiceStatus.BLOCKED:
+        invoice.status = InvoiceStatus.BLOCKED
+        invoice.notes = result.blocking_reason
+    elif disposition is InvoiceStatus.NEEDS_REVIEW:
+        invoice.status = InvoiceStatus.NEEDS_REVIEW
+        invoice.notes = result.blocking_reason
+    else:
+        invoice.status = InvoiceStatus.EXTRACTED
+        if auto_post:
+            await session.flush()
+            await post_invoice(session, accounting, invoice)
+
+    await session.flush()
+    return invoice
+
+
+async def ingest_folder(
+    session: AsyncSession,
+    folder: Path,
+    *,
+    openrouter: OpenRouterClient,
+    accounting: AccountingClient,
+    config: Settings | None = None,
+    auto_post: bool | None = None,
+    concurrency: int | None = None,
+) -> list[Invoice]:
+    """Process every supported document in a folder.
+
+    Extraction runs concurrently (it is entirely I/O bound), but the database
+    writes and the duplicate check are serialised deliberately: two copies of the
+    same invoice arriving in one batch must not both pass the duplicate check by
+    racing each other. invoice_01 and invoice_07 are exactly that case.
+    """
+    config = config or default_settings
+    master = await get_partner_master(accounting)
+    paths = sorted(p for p in Path(folder).iterdir() if p.suffix.lower() in SUPPORTED_SUFFIXES)
+
+    limit = asyncio.Semaphore(concurrency or config.max_concurrent_extractions)
+    processed: list[Invoice] = []
+
+    async def guarded(path: Path) -> Invoice | None:
+        async with limit:
+            return await process_document(
+                session, path,
+                openrouter=openrouter, accounting=accounting, master=master,
+                config=config, auto_post=auto_post,
+            )
+
+    # Sequential at the session level: AsyncSession is not safe for concurrent use,
+    # and serial processing is what makes in-batch duplicate detection reliable.
+    for path in paths:
+        try:
+            invoice = await guarded(path)
+        except Exception:  # noqa: BLE001 - isolate the failure to this document
+            logger.exception("failed to process %s", path.name)
+            await session.rollback()
+            continue
+        if invoice is not None:
+            processed.append(invoice)
+        await session.commit()
+
+    return processed
+
+
+async def summarize(session: AsyncSession) -> dict:
+    rows = await session.execute(
+        select(Invoice.status, func.count(Invoice.id)).group_by(Invoice.status)
+    )
+    return {status.value: count for status, count in rows.all()}
+
+
+async def load_invoice(session: AsyncSession, invoice_id: int) -> Invoice | None:
+    return await session.scalar(
+        select(Invoice)
+        .where(Invoice.id == invoice_id)
+        .options(
+            selectinload(Invoice.lines),
+            selectinload(Invoice.checks),
+            selectinload(Invoice.postings),
+            selectinload(Invoice.document),
+            selectinload(Invoice.review_events),
+        )
+    )

@@ -14,13 +14,12 @@ answer with a bare 409. Two reasons:
 
 from __future__ import annotations
 
-from dataclasses import asdict
 from datetime import date, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Invoice, InvoiceStatus, Posting
+from app.models import Document, Invoice, InvoiceStatus, Posting
 from app.pipeline.verify import DuplicateFindings
 
 # Statuses that mean "this invoice already occupies that invoice number".
@@ -90,8 +89,21 @@ async def find_duplicates(
     if not partner_code:
         return DuplicateFindings()
 
+    # Every column is selected explicitly rather than loading ORM objects: touching
+    # a lazy relationship (invoice.document) inside async code raises MissingGreenlet.
     stmt = (
-        select(Invoice, Posting.accounting_id)
+        select(
+            Invoice.id,
+            Invoice.document_id,
+            Invoice.partner_code,
+            Invoice.invoice_number,
+            Invoice.total_amount,
+            Invoice.issue_date,
+            Invoice.status,
+            Document.filename,
+            Posting.accounting_id,
+        )
+        .join(Document, Document.id == Invoice.document_id)
         .outerjoin(
             Posting,
             (Posting.invoice_id == Invoice.id) & (Posting.succeeded.is_(True)),
@@ -102,20 +114,19 @@ async def find_duplicates(
     if exclude_invoice_id is not None:
         stmt = stmt.where(Invoice.id != exclude_invoice_id)
 
-    rows = (await session.execute(stmt)).all()
     existing = [
         {
-            "invoice_id": inv.id,
-            "document_id": inv.document_id,
-            "partner_code": inv.partner_code,
-            "invoice_number": inv.invoice_number,
-            "total_amount": inv.total_amount,
-            "issue_date": inv.issue_date,
-            "filename": inv.document.filename if inv.document else None,
-            "accounting_id": accounting_id,
-            "status": inv.status.value,
+            "invoice_id": row.id,
+            "document_id": row.document_id,
+            "partner_code": row.partner_code,
+            "invoice_number": row.invoice_number,
+            "total_amount": row.total_amount,
+            "issue_date": row.issue_date,
+            "filename": row.filename,
+            "accounting_id": row.accounting_id,
+            "status": row.status.value,
         }
-        for inv, accounting_id in rows
+        for row in (await session.execute(stmt)).all()
     ]
     return find_duplicates_in(
         partner_code=partner_code,
