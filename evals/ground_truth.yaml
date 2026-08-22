@@ -1,0 +1,526 @@
+# Hand-built ground truth for the 12 sample invoices.
+# Transcribed by reading each document directly, then cross-checked against the
+# accounting API's own arithmetic (sum of lines; floor(subtotal x rate) per tax code).
+#
+# Note invoice_09: its printed total does not reconcile with its own line items.
+# That is a defect in the supplier's document, not a transcription error, and the
+# pipeline is expected to catch it rather than post it.
+
+invoice_01.pdf:
+  supplier_name: 株式会社山田製作所
+  registration_no: T1010001000101
+  expected_partner_code: P-1001
+  invoice_number: YM-2026-0107
+  issue_date: '2026-01-07'
+  due_date: '2026-02-28'
+  subtotal: 304000
+  tax_amount: 30400
+  total_amount: 334400
+  lines:
+  - description: 精密部品A-100
+    quantity: 120
+    unit: 個
+    unit_price: 1250
+    amount: 150000
+    tax_code: T10
+  - description: 精密部品B-220
+    quantity: 40
+    unit: 個
+    unit_price: 3400
+    amount: 136000
+    tax_code: T10
+  - description: 梱包・輸送費
+    quantity: null
+    unit: 式
+    unit_price: null
+    amount: 18000
+    tax_code: T10
+  traps:
+  - text-layer PDF baseline
+  expected_disposition: AUTO
+invoice_02.pdf:
+  supplier_name: 大阪機械工業株式会社
+  registration_no: T4040004000404
+  expected_partner_code: P-1004
+  invoice_number: OSK-26-0112
+  issue_date: '2026-01-12'
+  due_date: '2026-02-20'
+  subtotal: 1419080
+  tax_amount: 141908
+  total_amount: 1560988
+  lines:
+  - description: 治具部材 No.001
+    quantity: 6
+    unit: 個
+    unit_price: 930
+    amount: 5580
+    tax_code: T10
+  - description: 治具部材 No.002
+    quantity: 7
+    unit: 個
+    unit_price: 1060
+    amount: 7420
+    tax_code: T10
+  - description: 治具部材 No.003
+    quantity: 8
+    unit: 個
+    unit_price: 1190
+    amount: 9520
+    tax_code: T10
+  - description: 治具部材 No.004
+    quantity: 9
+    unit: 個
+    unit_price: 1320
+    amount: 11880
+    tax_code: T10
+  - description: 治具部材 No.005
+    quantity: 10
+    unit: 個
+    unit_price: 1450
+    amount: 14500
+    tax_code: T10
+  - description: 治具部材 No.006
+    quantity: 11
+    unit: 個
+    unit_price: 1580
+    amount: 17380
+    tax_code: T10
+  - description: 治具部材 No.007
+    quantity: 12
+    unit: 個
+    unit_price: 1710
+    amount: 20520
+    tax_code: T10
+  - description: 治具部材 No.008
+    quantity: 13
+    unit: 個
+    unit_price: 1840
+    amount: 23920
+    tax_code: T10
+  - description: 治具部材 No.009
+    quantity: 14
+    unit: 個
+    unit_price: 1970
+    amount: 27580
+    tax_code: T10
+  - description: 治具部材 No.010
+    quantity: 15
+    unit: 個
+    unit_price: 2100
+    amount: 31500
+    tax_code: T10
+  - description: 治具部材 No.011
+    quantity: 16
+    unit: 個
+    unit_price: 2230
+    amount: 35680
+    tax_code: T10
+  - description: 治具部材 No.012
+    quantity: 17
+    unit: 個
+    unit_price: 2360
+    amount: 40120
+    tax_code: T10
+  - description: 治具部材 No.013
+    quantity: 18
+    unit: 個
+    unit_price: 2490
+    amount: 44820
+    tax_code: T10
+  - description: 治具部材 No.014
+    quantity: 19
+    unit: 個
+    unit_price: 2620
+    amount: 49780
+    tax_code: T10
+  - description: 治具部材 No.015
+    quantity: 20
+    unit: 個
+    unit_price: 2750
+    amount: 55000
+    tax_code: T10
+  - description: 治具部材 No.016
+    quantity: 21
+    unit: 個
+    unit_price: 2880
+    amount: 60480
+    tax_code: T10
+  - description: 治具部材 No.017
+    quantity: 22
+    unit: 個
+    unit_price: 3010
+    amount: 66220
+    tax_code: T10
+  - description: 治具部材 No.018
+    quantity: 23
+    unit: 個
+    unit_price: 3140
+    amount: 72220
+    tax_code: T10
+  - description: 治具部材 No.019
+    quantity: 24
+    unit: 個
+    unit_price: 3270
+    amount: 78480
+    tax_code: T10
+  - description: 治具部材 No.020
+    quantity: 25
+    unit: 個
+    unit_price: 3400
+    amount: 85000
+    tax_code: T10
+  - description: 治具部材 No.021
+    quantity: 26
+    unit: 個
+    unit_price: 3530
+    amount: 91780
+    tax_code: T10
+  - description: 治具部材 No.022
+    quantity: 27
+    unit: 個
+    unit_price: 3660
+    amount: 98820
+    tax_code: T10
+  - description: 治具部材 No.023
+    quantity: 28
+    unit: 個
+    unit_price: 3790
+    amount: 106120
+    tax_code: T10
+  - description: 治具部材 No.024
+    quantity: 29
+    unit: 個
+    unit_price: 3920
+    amount: 113680
+    tax_code: T10
+  - description: 治具部材 No.025
+    quantity: 30
+    unit: 個
+    unit_price: 4050
+    amount: 121500
+    tax_code: T10
+  - description: 治具部材 No.026
+    quantity: 31
+    unit: 個
+    unit_price: 4180
+    amount: 129580
+    tax_code: T10
+  traps:
+  - 2 pages
+  - 26 line items
+  - totals printed only on page 2
+  expected_disposition: NEEDS_REVIEW
+  disposition_reason: total exceeds the 1,000,000 JPY auto-approval limit (policy control, not a defect)
+invoice_03.pdf:
+  supplier_name: 東京フーズ株式会社
+  registration_no: T3030003000303
+  expected_partner_code: P-1003
+  invoice_number: TF-2026-0115
+  issue_date: '2026-01-15'
+  due_date: '2026-02-15'
+  subtotal: 115340
+  tax_amount: 10017
+  total_amount: 125357
+  lines:
+  - description: 業務用コーヒー豆 1kg
+    quantity: 24
+    unit: 袋
+    unit_price: 2800
+    amount: 67200
+    tax_code: T08
+  - description: 紙コップ 100個入
+    quantity: 30
+    unit: 箱
+    unit_price: 1200
+    amount: 36000
+    tax_code: T10
+  - description: ミネラルウォーター 2L
+    quantity: 48
+    unit: 本
+    unit_price: 180
+    amount: 8640
+    tax_code: T08
+  - description: 配送手数料
+    quantity: null
+    unit: 式
+    unit_price: null
+    amount: 3500
+    tax_code: T10
+  traps:
+  - mixed 8%/10% tax
+  - floor rounding 6,067.2 -> 6,067
+  expected_disposition: AUTO
+invoice_04.jpg:
+  supplier_name: 有限会社佐藤商店
+  registration_no: T2020002000202
+  expected_partner_code: P-1002
+  invoice_number: SATO-260118
+  issue_date: '2026-01-18'
+  due_date: '2026-03-31'
+  subtotal: 219000
+  tax_amount: 21900
+  total_amount: 240900
+  lines:
+  - description: 事務用品セット
+    quantity: 15
+    unit: セット
+    unit_price: 4800
+    amount: 72000
+    tax_code: T10
+  - description: コピー用紙 A4
+    quantity: 60
+    unit: 箱
+    unit_price: 2450
+    amount: 147000
+    tax_code: T10
+  traps:
+  - handwritten 受領 stamp (harmless workflow noise)
+  - YYYY/MM/DD date format
+  expected_disposition: AUTO
+  expect_handwriting: true
+  expect_handwriting_on_payment: false
+invoice_05.jpg:
+  supplier_name: みらいITソリューションズ株式会社
+  registration_no: T5050005000505
+  expected_partner_code: P-1005
+  invoice_number: MIT-2026-011
+  issue_date: '2026-01-20'
+  due_date: '2026-02-28'
+  subtotal: 397000
+  tax_amount: 39700
+  total_amount: 436700
+  lines:
+  - description: 基幹システム保守（1月分）
+    quantity: null
+    unit: 式
+    unit_price: null
+    amount: 280000
+    tax_code: T10
+  - description: 障害対応（時間外）
+    quantity: 6
+    unit: 時間
+    unit_price: 12000
+    amount: 72000
+    tax_code: T10
+  - description: VPN回線利用料
+    quantity: null
+    unit: 式
+    unit_price: null
+    amount: 45000
+    tax_code: T10
+  traps:
+  - null quantity/unit_price on 式 lines
+  expected_disposition: AUTO
+invoice_06.jpg:
+  supplier_name: ヤマダ製作所
+  registration_no: T1010001000101
+  expected_partner_code: P-1001
+  invoice_number: YM-2026-0122
+  issue_date: '2026-01-22'
+  due_date: '2026-02-28'
+  subtotal: 93000
+  tax_amount: 9300
+  total_amount: 102300
+  lines:
+  - description: 表面処理加工
+    quantity: 200
+    unit: 個
+    unit_price: 340
+    amount: 68000
+    tax_code: T10
+  - description: 特急対応費
+    quantity: null
+    unit: 式
+    unit_price: null
+    amount: 25000
+    tax_code: T10
+  traps:
+  - supplier printed as katakana ALIAS, not the legal name
+  expected_disposition: AUTO
+invoice_07.jpg:
+  supplier_name: 株式会社山田製作所
+  registration_no: T1010001000101
+  expected_partner_code: P-1001
+  invoice_number: YM-2026-0107
+  issue_date: '2026-01-07'
+  due_date: '2026-02-28'
+  subtotal: 304000
+  tax_amount: 30400
+  total_amount: 334400
+  lines:
+  - description: 精密部品A-100
+    quantity: 120
+    unit: 個
+    unit_price: 1250
+    amount: 150000
+    tax_code: T10
+  - description: 精密部品B-220
+    quantity: 40
+    unit: 個
+    unit_price: 3400
+    amount: 136000
+    tax_code: T10
+  - description: 梱包・輸送費
+    quantity: null
+    unit: 式
+    unit_price: null
+    amount: 18000
+    tax_code: T10
+  traps:
+  - DUPLICATE of invoice_01, arriving as a skewed scan
+  - this is the exact scenario the CEO described in the brief
+  expected_disposition: BLOCKED
+  disposition_reason: duplicate of invoice_01.pdf (same partner + invoice number)
+invoice_08.jpg:
+  supplier_name: 東京フーズ株式会社
+  registration_no: T3030003000303
+  expected_partner_code: P-1003
+  invoice_number: TF-2026-0125
+  issue_date: '2026-01-25'
+  due_date: '2026-02-25'
+  subtotal: 110000
+  tax_amount: 8936
+  total_amount: 118936
+  lines:
+  - description: 冷凍食材セット
+    quantity: 12
+    unit: 箱
+    unit_price: 8600
+    amount: 103200
+    tax_code: T08
+  - description: 保冷配送料
+    quantity: null
+    unit: 式
+    unit_price: null
+    amount: 6800
+    tax_code: T10
+  traps:
+  - mixed 8%/10% tax
+  - RED PEN altering the bank account number
+  - 至急 stamp
+  expected_disposition: NEEDS_REVIEW
+  disposition_reason: handwriting alters payment/bank details
+  expect_handwriting: true
+  expect_handwriting_on_payment: true
+invoice_09.pdf:
+  supplier_name: 大阪機械工業株式会社
+  registration_no: T4040004000404
+  expected_partner_code: P-1004
+  invoice_number: OSK-26-0128
+  issue_date: '2026-01-28'
+  due_date: '2026-02-20'
+  subtotal: 134088
+  tax_amount: 13408
+  total_amount: 147497
+  lines:
+  - description: シャフト加工
+    quantity: 37
+    unit: 個
+    unit_price: 2733
+    amount: 101121
+    tax_code: T10
+  - description: 熱処理
+    quantity: 37
+    unit: 個
+    unit_price: 891
+    amount: 32967
+    tax_code: T10
+  traps:
+  - PDF with NO text layer (scanned image only)
+  - floor rounding 13,408.8 -> 13,408
+  - 'DOCUMENT DEFECT: printed 合計 147,497 but 134,088 + 13,408 = 147,496'
+  expected_disposition: NEEDS_REVIEW
+  disposition_reason: 'the supplier''s own totals do not reconcile: printed total is 1 JPY above lines
+    + floored tax. Posting it as printed returns AMOUNT_MISMATCH.'
+  document_defect:
+    kind: TOTAL_ROUNDING
+    printed_total: 147497
+    recalculated_total: 147496
+    difference: 1
+    explanation: supplier floored the tax on the tax line but rounded it up when computing the total
+  postable_total: 147496
+invoice_10.jpg:
+  supplier_name: 新星ロジスティクス株式会社
+  registration_no: T9090009000909
+  expected_partner_code: null
+  invoice_number: SSL-2026-0203
+  issue_date: '2026-02-03'
+  due_date: '2026-03-31'
+  subtotal: 194800
+  tax_amount: 19480
+  total_amount: 214280
+  lines:
+  - description: 倉庫保管料（1月分）
+    quantity: null
+    unit: 式
+    unit_price: null
+    amount: 120000
+    tax_code: T10
+  - description: 入出庫作業
+    quantity: 340
+    unit: 件
+    unit_price: 220
+    amount: 74800
+    tax_code: T10
+  traps:
+  - supplier is NOT in the partner master -> unpostable
+  expected_disposition: BLOCKED
+  disposition_reason: 'PARTNER_NOT_FOUND: supplier absent from the master'
+invoice_11.jpg:
+  supplier_name: 有限会社佐藤商店
+  registration_no: T2020002000202
+  expected_partner_code: P-1002
+  invoice_number: SATO-260205
+  issue_date: '2026-02-05'
+  due_date: '2026-03-31'
+  subtotal: 113700
+  tax_amount: 11370
+  total_amount: 125070
+  lines:
+  - description: 清掃用品一式
+    quantity: null
+    unit: 式
+    unit_price: null
+    amount: 34500
+    tax_code: T10
+  - description: トイレットペーパー
+    quantity: 40
+    unit: 箱
+    unit_price: 1980
+    amount: 79200
+    tax_code: T10
+  traps:
+  - 'Japanese era dates: 令和8年2月5日 -> 2026-02-05'
+  expected_disposition: AUTO
+invoice_12.jpg:
+  supplier_name: みらいITソリューションズ株式会社
+  registration_no: T5050005000505
+  expected_partner_code: P-1005
+  invoice_number: MIT-2026-014
+  issue_date: '2026-02-10'
+  due_date: '2026-03-31'
+  subtotal: 540000
+  tax_amount: 54000
+  total_amount: 594000
+  lines:
+  - description: 業務システム改修
+    quantity: null
+    unit: 式
+    unit_price: null
+    amount: 450000
+    tax_code: T10
+  - description: 追加ライセンス
+    quantity: 5
+    unit: 本
+    unit_price: 24000
+    amount: 120000
+    tax_code: T10
+  - description: 値引き
+    quantity: null
+    unit: 式
+    unit_price: null
+    amount: -30000
+    tax_code: T10
+  traps:
+  - 'NEGATIVE line item: 値引き printed as △30,000'
+  expected_disposition: AUTO

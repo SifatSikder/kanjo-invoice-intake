@@ -10,3 +10,7 @@ evals/results/
 
 # Internal working docs — not part of the submission
 PLAN.md
+.venv/
+storage/
+*.egg-info/
+.pytest_cache/
