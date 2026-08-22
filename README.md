@@ -17,8 +17,8 @@ cp .env.example .env          # then put your OPENROUTER_API_KEY in it
 docker compose up --build
 ```
 
-That is the single command. It starts four services, applies the database
-migrations, and processes all 12 sample invoices on first boot.
+That is the single command. It starts four services and applies the database
+migrations. The app opens on an empty upload screen.
 
 | | |
 |---|---|
@@ -30,10 +30,23 @@ migrations, and processes all 12 sample invoices on first boot.
 > Host ports 8001 and 5433 are used because 8000 and 5432 are commonly already
 > taken. Inside the compose network the services still talk on 8000 and 5432.
 
-Open <http://localhost:3000>. Seeding takes about two minutes — press **Refresh**
-as it fills in.
+### Use it
 
-### What you should see
+Open <http://localhost:3000>. The screen starts empty, with a drop zone.
+
+**Drop an invoice on it.** It appears immediately as *reading…*, and the row
+updates itself as the document is read, checked and — if everything passes —
+registered in the accounting system. No page reload, no restart, no folder.
+
+That is the whole product: someone has an invoice in front of them and wants it
+dealt with. The client's staff handle them *"one by one, as they arrive from
+suppliers"*, so that is the shape the intake takes.
+
+To see every case at once, use the **process the 12 sample invoices** link under
+the drop zone (or `make ingest`), which runs the whole sample folder — the bulk
+path, for clearing a backlog.
+
+### What you should see with all 12
 
 | | |
 |---|---|
@@ -67,9 +80,9 @@ before you click.
 ## Other commands
 
 ```bash
-make test      # 75 offline tests: no LLM, no database, ~0.1s
+make test      # 86 offline tests: no LLM, no database, ~0.2s
 make status    # where every invoice ended up
-make ingest    # re-run the folder (idempotent — documents are keyed by content hash)
+make ingest    # bulk-process the sample folder (idempotent — keyed by content hash)
 make reset     # clear our records and empty the accounting ledger
 make eval      # score models against hand-built ground truth (costs a few cents)
 make down      # stop; `make clean` also drops the database volume
@@ -92,7 +105,7 @@ cd backend && .venv/bin/python -m app.cli ingest
 ## How it works
 
 ```
-invoices/ ─▶ render ─▶ extract ─▶ normalise ─▶ resolve supplier ─▶ dedupe ─▶ verify
+ upload  ─▶ render ─▶ extract ─▶ normalise ─▶ resolve supplier ─▶ dedupe ─▶ verify
               │          │            │              │                │        │
          page images  vision      dates, ¥,      登録番号 then     against    18 checks
          + text layer  model      tax codes      name/alias        our DB        │

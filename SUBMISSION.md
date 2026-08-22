@@ -75,11 +75,16 @@ caught any of them.
 3. **Registration** into the accounting API, including handling every documented
    error code and the one problem the API's design leaves to the caller (no
    idempotency key).
-4. **The review screen** — document beside the data, with the accounting
+4. **Upload as the primary way in** — someone drops an invoice on the screen and
+   watches it get read, checked and registered. The client's staff handle
+   invoices "one by one, as they arrive from suppliers", so that is the shape the
+   intake takes. Bulk folder ingest still exists for clearing a backlog, but it is
+   the secondary path, not the product.
+5. **The review screen** — document beside the data, with the accounting
    system's own arithmetic re-run live in the browser as the reviewer types.
-5. **A model eval harness** scoring candidates against the ground truth, so
+6. **A model eval harness** scoring candidates against the ground truth, so
    "which model and why" has a number behind it.
-6. **One command to run it all**, seeding the samples on first boot.
+7. **One command to run it all.**
 
 **What you left out, and why**
 
@@ -109,7 +114,7 @@ because it informs a choice I can change with one config value.
 ## 4. Design and technology choices
 
 ```
-invoices/ ─▶ render ─▶ extract ─▶ normalise ─▶ resolve supplier ─▶ dedupe ─▶ verify
+ upload  ─▶ render ─▶ extract ─▶ normalise ─▶ resolve supplier ─▶ dedupe ─▶ verify
               │          │            │              │                │        │
          page images  vision      dates, ¥,      登録番号 then     against    18 checks
          + text layer  model      tax codes      name/alias        our DB        │
@@ -119,6 +124,17 @@ invoices/ ─▶ render ─▶ extract ─▶ normalise ─▶ resolve supplier 
                         │                           │                            │
                  POST /invoices              review queue              never registered
 ```
+
+**Intake: upload, not a folder.** An earlier version of this seeded a folder at
+boot, which made the pipeline demonstrable but made the *intake invisible* — a
+queue that filled itself, with no answer to "how does an invoice get in?" beyond
+"put it in a folder and restart". That is not how the client works. Their staff
+handle invoices one at a time as they arrive, so uploading is the primary path
+and the folder is the bulk path. The upload request returns as soon as the file
+is stored, before anything is read: the uploader sees the invoice appear as
+*reading…* and the row updates itself through extraction, verification and
+registration. Blocking the response for the ten seconds an extraction takes would
+leave them staring at a spinner with no evidence the upload had even landed.
 
 **The rule everything else follows from: the model transcribes, our code
 computes.** The prompt forbids the model from doing arithmetic, converting a
@@ -431,8 +447,10 @@ database:
    examples attacks the one metric that determines ROI (§7). Second because it
    compounds: it makes every future month cheaper, but only once there is enough
    correction history to learn from — which #1 helps produce.
-3. **Email intake and a reconciliation job.** Poll the shared mailbox, split
-   attachments, and run a scheduled diff of `GET /invoices` against our records.
-   Third not because it is least important — it is how documents genuinely arrive
-   — but because it changes the front door rather than the decision quality, and
-   the decision quality is what the client's actual complaint was about.
+3. **Email intake and a reconciliation job.** Uploading covers the case where
+   someone has the document in hand; most arrive as email attachments. Poll the
+   shared mailbox, split the attachments, and feed them through the same
+   `accept_document` path the upload endpoint uses — plus a scheduled diff of
+   `GET /invoices` against our records. Third not because it is unimportant but
+   because it widens the front door rather than improving the decisions, and the
+   decisions are what the client's actual complaint was about.

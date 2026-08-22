@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
@@ -43,7 +44,7 @@ from app.pipeline.dedupe import find_duplicates
 from app.pipeline.extract import PROMPT_VERSION, extract_document, normalize_extraction
 from app.pipeline.partners import PartnerMaster, PartnerMatch
 from app.pipeline.post import post_invoice
-from app.pipeline.render import prepare_document
+from app.pipeline.render import RenderedDocument, prepare_document
 from app.pipeline.verify import VerificationResult, run_checks
 from app.schemas import NormalizedInvoice, NormalizedLine
 
@@ -220,28 +221,43 @@ async def verify_invoice(
     return result
 
 
-async def process_document(
+@dataclass
+class Accepted:
+    """The result of taking a document in, before anything has been read."""
+
+    invoice: Invoice
+    rendered: RenderedDocument
+    already_ingested: bool = False
+
+
+async def accept_document(
     session: AsyncSession,
     path: Path,
     *,
-    openrouter: OpenRouterClient,
-    accounting: AccountingClient,
-    master: PartnerMaster,
     config: Settings | None = None,
-    auto_post: bool | None = None,
-) -> Invoice | None:
-    """Ingest one file end to end. Returns None when it was already ingested."""
-    config = config or default_settings
-    auto_post = config.auto_post_enabled if auto_post is None else auto_post
+) -> Accepted:
+    """Take a document in and record it, without reading it yet.
 
+    Split out from processing so an upload can return the moment the file is
+    safely stored: the person who dropped it sees it appear immediately as
+    "reading", rather than watching a spinner for ten seconds with no feedback
+    and no idea whether the upload even landed.
+
+    Rendering happens here because it is fast, local, and produces the SHA-256
+    that decides whether we have seen this document before.
+    """
+    config = config or default_settings
     rendered = prepare_document(path, storage_dir=config.storage_dir)
 
     existing = await session.scalar(
-        select(Document).where(Document.sha256 == rendered.sha256)
+        select(Invoice)
+        .join(Document, Document.id == Invoice.document_id)
+        .where(Document.sha256 == rendered.sha256)
+        .options(selectinload(Invoice.document))
     )
     if existing is not None:
-        logger.info("%s already ingested (sha256 %s); skipping", path.name, rendered.sha256[:12])
-        return None
+        logger.info("%s already ingested (sha256 %s)", path.name, rendered.sha256[:12])
+        return Accepted(invoice=existing, rendered=rendered, already_ingested=True)
 
     document = Document(
         filename=rendered.filename,
@@ -263,6 +279,26 @@ async def process_document(
     )
     session.add(invoice)
     await session.flush()
+    return Accepted(invoice=invoice, rendered=rendered)
+
+
+async def process_accepted(
+    session: AsyncSession,
+    accepted: Accepted,
+    *,
+    openrouter: OpenRouterClient,
+    accounting: AccountingClient,
+    master: PartnerMaster,
+    config: Settings | None = None,
+    auto_post: bool | None = None,
+) -> Invoice:
+    """Read, verify and register a document that has already been accepted."""
+    config = config or default_settings
+    auto_post = config.auto_post_enabled if auto_post is None else auto_post
+    invoice = accepted.invoice
+    rendered = accepted.rendered
+    document_id = invoice.document_id
+    path = Path(rendered.filename)
 
     # --- extraction ----------------------------------------------------------
     try:
@@ -272,7 +308,7 @@ async def process_document(
     except Exception as exc:  # noqa: BLE001 - one bad document must not kill a batch
         logger.exception("extraction failed for %s", path.name)
         session.add(Extraction(
-            document_id=document.id, model=config.extraction_model,
+            document_id=document_id, model=config.extraction_model,
             prompt_version=PROMPT_VERSION, raw_response={}, error=str(exc),
         ))
         invoice.status = InvoiceStatus.EXTRACT_FAILED
@@ -282,7 +318,7 @@ async def process_document(
 
     normalized = normalize_extraction(raw)
     extraction = Extraction(
-        document_id=document.id,
+        document_id=document_id,
         model=completion.model,
         prompt_version=PROMPT_VERSION,
         raw_response=raw.model_dump(),
@@ -339,6 +375,27 @@ async def process_document(
 
     await session.flush()
     return invoice
+
+
+async def process_document(
+    session: AsyncSession,
+    path: Path,
+    *,
+    openrouter: OpenRouterClient,
+    accounting: AccountingClient,
+    master: PartnerMaster,
+    config: Settings | None = None,
+    auto_post: bool | None = None,
+) -> Invoice | None:
+    """Accept and process one file. Returns None when it was already ingested."""
+    accepted = await accept_document(session, path, config=config)
+    if accepted.already_ingested:
+        return None
+    return await process_accepted(
+        session, accepted,
+        openrouter=openrouter, accounting=accounting, master=master,
+        config=config, auto_post=auto_post,
+    )
 
 
 async def ingest_folder(

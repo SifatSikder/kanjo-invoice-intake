@@ -34,6 +34,9 @@ JPEG_QUALITY = 88
 # A PDF that yields less than this many characters is treated as a scan.
 TEXT_LAYER_MIN_CHARS = 40
 
+# Shown to a person when they upload something we cannot open.
+SUPPORTED_SUFFIXES_HINT = "a PDF, JPG, PNG, TIFF or WebP"
+
 
 @dataclass
 class RenderedPage:

@@ -1,7 +1,7 @@
 # Demo script (≤ 3 minutes)
 
-Recorded against a clean run: `docker compose down -v && docker compose up --build`,
-then wait for the dashboard to show 12 documents.
+Recorded against a clean run: `docker compose down -v && docker compose up --build`.
+The app opens empty — that is deliberate, and the demo starts by filling it.
 
 ---
 
@@ -11,12 +11,23 @@ then wait for the dashboard to show 12 documents.
 > caused the same invoice to be paid twice. So I did not build something that
 > types faster — I built something that refuses to type the wrong thing."
 
-**0:15 — One command**
+**0:15 — One command, then drop an invoice in**
 
-Show the terminal: `docker compose up --build`. Note that it starts the client's
-accounting system unmodified, applies migrations, and processes all 12 samples.
+Show the terminal: `docker compose up --build`. Note it starts the client's
+accounting system unmodified and applies migrations.
 
-**0:30 — The dashboard** (`localhost:3000`)
+Open `localhost:3000` — empty, with a drop zone. **Drag `invoice_01.pdf` onto it.**
+
+> "It appears straight away as 'reading'. Ten seconds later it has moved itself to
+> Registered — supplier matched, ¥334,400, accounting ID ACC-0001. No reload, no
+> folder, no restart. That's the whole product: an invoice arrives, you drop it in,
+> it's filed."
+
+Drag the same file in again:
+
+> "And it won't take it twice."
+
+**0:45 — Load the other eleven** (click *process the 12 sample invoices*)
 
 Point at the three groups, top to bottom:
 
@@ -29,7 +40,7 @@ Call out the auto-pass rate card:
 > "This is the number that decides whether this pays for itself. The AI costs
 > less than half a cent an invoice — review minutes are the real cost."
 
-**0:50 — The duplicate** (open `invoice_07.jpg`)
+**1:05 — The duplicate** (open `invoice_07.jpg`)
 
 > "This is the CEO's email, in the sample data. It's the same invoice as
 > invoice_01, arriving again as a scan. Every check passes — the reading is
@@ -40,7 +51,7 @@ Point at the greyed-out **Approve & register** button:
 > "A blocker can't be clicked past. Not by me, not by the API. That needs a
 > decision outside this screen."
 
-**1:20 — The bank-detail change** (open `invoice_08.jpg`)
+**1:30 — The bank-detail change** (open `invoice_08.jpg`)
 
 Point at the red pen on the document, then at the two handwriting checks:
 
@@ -50,7 +61,7 @@ Point at the red pen on the document, then at the two handwriting checks:
 > even part of the accounting system's payload — so if this pipeline didn't flag
 > it, nothing downstream would."
 
-**1:50 — The supplier's own mistake** (open `invoice_09.pdf`)
+**1:55 — The supplier's own mistake** (open `invoice_09.pdf`)
 
 > "This one's my favourite. The extraction is perfect. The invoice is wrong."
 

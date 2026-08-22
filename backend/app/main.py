@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import admin, invoices, review
+from app.api import admin, invoices, review, upload
 from app.api.deps import accounting_client
 from app.config import settings
 
@@ -55,6 +55,7 @@ app.add_middleware(
 
 app.include_router(invoices.router)
 app.include_router(review.router)
+app.include_router(upload.router)
 app.include_router(admin.router)
 
 

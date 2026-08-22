@@ -56,7 +56,7 @@ services:
       AMOUNT_REVIEW_THRESHOLD_JPY: ${AMOUNT_REVIEW_THRESHOLD_JPY:-1000000}
       INVOICE_DIR: /data/invoices
       STORAGE_DIR: /data/storage
-      SEED_ON_STARTUP: ${SEED_ON_STARTUP:-true}
+      SEED_ON_STARTUP: ${SEED_ON_STARTUP:-false}
     volumes:
       - ./invoices:/data/invoices:ro
       - storage:/data/storage
