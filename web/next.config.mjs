@@ -1,11 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
-  // The browser talks to the API through this rewrite, so the page works
-  // identically whether it is served from Docker or from `npm run dev`.
-  async rewrites() {
-    const target = process.env.API_BASE || "http://localhost:8001";
-    return [{ source: "/api/:path*", destination: `${target}/api/:path*` }];
-  },
+  // No rewrites: Next bakes those into the build manifest, so they cannot read
+  // API_BASE from the runtime environment. app/api/[...path]/route.ts proxies
+  // to the pipeline API per request instead.
 };
 export default nextConfig;

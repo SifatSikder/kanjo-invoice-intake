@@ -237,12 +237,58 @@ eval scored against AI-generated expectations measures agreement, not accuracy.
 - **Models are scored, not trusted.** `make eval` runs each candidate over all 12
   and reports field accuracy, line accuracy and cost.
 
-<!-- TODO: paste evals/results/table.md here after `make eval` -->
+`make eval` — all 12 invoices, scored against the hand-built ground truth. Field
+accuracy is exact match on the seven values that reach the accounting payload;
+"perfect" means every field *and* every line item correct.
+
+| Model | Field accuracy | Line accuracy | Perfect invoices | Cost / invoice | Latency |
+|---|---|---|---|---|---|
+| **`google/gemini-3.7-flash`** ← chosen | **100.0%** | **100.0%** | **12/12** | **$0.0037** | 10.2s |
+| `anthropic/claude-sonnet-5` | 100.0% | 100.0% | 12/12 | $0.0200 | 12.5s |
+| `google/gemini-2.5-flash-lite` | 98.7% | 100.0% | 10/12 | $0.0005 | 5.1s |
+| `google/gemma-4-31b-it:free` | 0.0% | 0.0% | 0/12 | $0.0000 | — |
+
+Three things came out of this that I would not have got from reading model cards:
+
+- **The frontier model is not worth 5.4× here.** Sonnet-5 and Gemini 3.7 Flash
+  both read all 12 perfectly. On documents this structured, paying more buys
+  nothing, so the cheaper of two perfect scores wins.
+- **The free tier is not a fallback, it is a non-starter.** `gemma-4-31b-it:free`
+  returned HTTP 429 on 11 of 12 calls even at one request at a time. The brief
+  says a free tier is acceptable, and on accuracy grounds it might have been —
+  but it never got far enough to find out. Worth knowing before someone plans a
+  month-end run around it.
+- **The cheapest paid model is 7× cheaper again and *almost* good enough** —
+  which is exactly the situation where a verification gate pays for itself. See
+  below.
 
 **A case where the AI got it wrong**
 
-The clearest one is not a misread — it is **self-reported confidence, which turned
-out to be worthless.** I asked the model for a 0–1 confidence per field and made
+The best one came out of the eval. On invoice_08, `gemini-2.5-flash-lite` read the
+consumption-tax total as **9,036** where the page prints **8,936** — a single-digit
+misread on one of the three numbers that decide what gets paid.
+
+What makes it a good example is that the model contradicted *itself*. It reported
+the two tax rows correctly — `10% on 6,800 → 680` and `8% on 103,200 → 8,256`,
+which sum to 8,936 — and then reported the total as 9,036. Every line item, the
+subtotal and the grand total were right. Only that one field was wrong, and it was
+wrong in a way no confidence score flagged.
+
+The gate caught it for free:
+
+```
+ERROR  arithmetic.tax_per_code
+       Tax recalculated per tax code is 8,936 but the invoice states 9,036
+→ NEEDS_REVIEW
+```
+
+No second model, no extra call. The invoice prints its own tax breakdown, so the
+document contains everything needed to catch the error, and re-deriving the total
+from the line items finds it immediately. **This is the entire argument for the
+design in one case:** it is what lets a 7×-cheaper model be a real option rather
+than a gamble, because its errors surface as review items instead of as payments.
+
+**A second one — self-reported confidence turned out to be worthless.** I asked the model for a 0–1 confidence per field and made
 `confidence.floor` an ERROR-severity check. In practice it returns 0.99–1.00 on
 essentially everything, including invoice_09, where it had faithfully transcribed
 a total that does not reconcile with its own line items, and invoice_07, a
@@ -296,7 +342,7 @@ read correctly, which is why we also check for duplicates ourselves first.
 | invoice_06.jpg | Registered `ACC-0005` | Printed as ヤマダ製作所, a katakana alias. Resolved to P-1001 via 登録番号 and corroborated by the master's alias list. |
 | invoice_07.jpg | **Blocked** | The same invoice as invoice_01, arriving as a skewed scan. Caught by our own duplicate check *before* any POST, and the reviewer is shown that it duplicates `ACC-0001` from `invoice_01.pdf`. **This is the failure the client's email describes.** |
 | invoice_08.jpg | **Review** → registered | Mixed tax read correctly. Held because the bank account number was altered in red pen — a payee change is the classic fraud vector, and bank details are not in the API payload, so nothing downstream would catch it. |
-| invoice_09.pdf | **Review** → registered `ACC-0008` at ¥147,496 | Scanned PDF with no text layer. Its **printed total is ¥1 higher than its own line items plus floored tax** — the supplier floored the tax on the tax line but rounded it up in the total. Posting as printed returns `AMOUNT_MISMATCH`. A human confirmed and it registered at the recalculated figure. |
+| invoice_09.pdf | **Review** → registered at ¥147,496 | Scanned PDF with no text layer. Its **printed total is ¥1 higher than its own line items plus floored tax** — the supplier floored the tax on the tax line but rounded it up in the total. Posting as printed returns `AMOUNT_MISMATCH`. A human confirmed and it registered at the recalculated figure. |
 | invoice_10.jpg | **Blocked** | 新星ロジスティクス is not in the partner master. No `partner_code` exists, so it is unpostable by construction. Queued for someone with authority to add the supplier — never auto-created. |
 | invoice_11.jpg | Registered `ACC-0006` | Dates printed as 令和8年2月5日 / 令和8年3月31日, converted to 2026-02-05 / 2026-03-31 in code, not by the model. |
 | invoice_12.jpg | Registered `ACC-0007` | 値引き discount printed as △30,000, parsed as −30,000. Without that, the subtotal is ¥60,000 too high and the line-sum check fails. |
