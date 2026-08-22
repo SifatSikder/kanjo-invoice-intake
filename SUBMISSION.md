@@ -352,7 +352,8 @@ blocked. The 2 blocked are not failures — registering either would have been.
 
 ## 7. Cost, limits, and risk in production
 
-- **Cost per invoice:** **$0.0039** measured, with `google/gemini-3.7-flash`.
+- **Cost per invoice:** **≈$0.004** measured across full runs with
+  `google/gemini-3.7-flash` ($0.0037–$0.0042 depending on the run).
   Roughly 3,000 input tokens (≈1,600px page image plus the text layer where one
   exists, plus a ~900-token prompt) and ~1,000 output tokens. Multi-page invoices
   scale with page count: invoice_02 at 2 pages cost about 1.5×.

@@ -27,7 +27,7 @@ Point at the three groups, top to bottom:
 Call out the auto-pass rate card:
 
 > "This is the number that decides whether this pays for itself. The AI costs
-> $0.0039 an invoice — review minutes are the real cost."
+> less than half a cent an invoice — review minutes are the real cost."
 
 **0:50 — The duplicate** (open `invoice_07.jpg`)
 
