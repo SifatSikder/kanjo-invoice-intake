@@ -43,10 +43,19 @@ supplier lookup is deterministic Python with tests — because those are exactly
 and a quiet failure in accounts payable is a wrong payment.</p>
 </div>
 
-<h2>0 · Before you start</h2>
-<p>Everything is already running. Confirm with:</p>
-<pre><span class="c"># all four services should say "Up"</span>
-docker compose ps</pre>
+<h2>0 · Start it — one command</h2>
+<p>From the project folder:</p>
+<pre><span class="c"># the .env with your OpenRouter key is already in place</span>
+docker compose up --build</pre>
+<p>Leave that terminal running; it streams the logs. First run builds the images
+(1–2 min), then the API becomes reachable in about 15 seconds and the twelve
+sample invoices are processed in the background over roughly 2–3 minutes.</p>
+<p>In a second terminal, confirm all four services are up:</p>
+<pre>docker compose ps</pre>
+<div class="box"><p><strong>Watch the seeding happen.</strong> Open the dashboard straight
+away and press <strong>Refresh</strong> every 20 seconds or so — invoices appear as they
+are processed. It is finished when the page shows 12 documents. You can also poll it:</p>
+<pre>curl -s localhost:8001/api/stats | python3 -m json.tool</pre></div>
 <table>
 <tr><th>Service</th><th>URL</th><th>What it is</th></tr>
 <tr><td>web</td><td><code>http://localhost:3000</code></td><td>The review screen — start here</td></tr>
