@@ -1,0 +1,266 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Invoice Intake — Testing Guide</title>
+<style>
+@page { size: A4; margin: 15mm 14mm; }
+* { box-sizing: border-box; }
+body { font: 10.5pt/1.5 "Helvetica Neue", Arial, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Hiragino Mincho ProN", "Apple SD Gothic Neo", sans-serif; color: #16191f; margin:0; }
+h1 { font-size: 21pt; margin: 0 0 2pt; letter-spacing: -0.4pt; }
+.sub { color:#5c6472; font-size:10pt; margin:0 0 14pt; }
+h2 { font-size: 13pt; margin: 18pt 0 7pt; page-break-after: avoid; padding-bottom:4pt; border-bottom:2px solid #1f5fd8; color:#123; }
+h3 { font-size: 11pt; margin: 12pt 0 5pt; page-break-after: avoid; color:#1f2733; }
+p { margin: 0 0 7pt; }
+ul, ol { margin: 0 0 8pt; padding-left: 18pt; }
+li { margin-bottom: 4pt; }
+code { font-family: "SF Mono", Menlo, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Hiragino Mincho ProN", "Apple SD Gothic Neo", monospace; font-size: 9pt; background:#f0f2f5; padding:1px 4px; border-radius:3px; }
+pre { background:#12161d; color:#e8ecf2; padding:9pt 11pt; border-radius:5pt; font-family:"SF Mono",Menlo,"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Hiragino Mincho ProN", "Apple SD Gothic Neo",monospace;
+      font-size:8.5pt; line-height:1.45; overflow-x:auto; white-space:pre-wrap; word-break:break-all; margin:0 0 8pt; }
+pre .c { color:#7f8c9b; }
+table { width:100%; border-collapse:collapse; page-break-inside:avoid; margin:0 0 10pt; font-size:9pt; }
+th,td { border:1px solid #d9dee6; padding:5pt 7pt; text-align:left; vertical-align:top; }
+th { background:#eef1f6; font-weight:600; font-size:8.5pt; text-transform:uppercase; letter-spacing:0.3pt; }
+td.n { text-align:right; font-family:"SF Mono",Menlo,"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Hiragino Mincho ProN", "Apple SD Gothic Neo",monospace; }
+.box { page-break-inside:avoid; border-left:3px solid #1f5fd8; background:#f4f7fd; padding:8pt 11pt; margin:0 0 10pt; }
+.box.warn { border-color:#b8860b; background:#fdf8ec; }
+.box.key { border-color:#0f7b4a; background:#eef8f2; }
+.box p:last-child { margin-bottom:0; }
+.step { background:#1f5fd8; color:#fff; border-radius:50%; width:17pt; height:17pt; display:inline-block;
+        text-align:center; line-height:17pt; font-size:9.5pt; font-weight:700; margin-right:5pt; }
+.pill { display:inline-block; padding:1px 6px; border-radius:9px; font-size:8pt; font-weight:700; }
+.p-ok{background:#e6f4ec;color:#0f7b4a}.p-rev{background:#fdf3e0;color:#9a6400}.p-blk{background:#f1ebfd;color:#5b21b6}
+.expect { border:1px solid #cfd6e0; border-radius:5pt; padding:8pt 11pt; margin:0 0 10pt; background:#fbfcfd; }
+.expect h4 { margin:0 0 5pt; font-size:9.5pt; text-transform:uppercase; letter-spacing:0.4pt; color:#5c6472; }
+.avoid { page-break-inside: avoid; }
+footer { margin-top:16pt; padding-top:7pt; border-top:1px solid #d9dee6; font-size:8.5pt; color:#7b838f; }
+</style></head><body>
+
+<h1>Invoice Intake — Testing Guide</h1>
+<p class="sub">Step-by-step walkthrough of every flow, with what to expect at each point and why it behaves that way.</p>
+
+<div class="box key">
+<p><strong>The one idea behind the whole system:</strong> the model <em>transcribes</em>, our code <em>computes</em>.
+The AI is only ever asked what characters are printed on the page. Every date conversion, yen amount, tax code and
+supplier lookup is deterministic Python with tests — because those are exactly where a language model fails quietly,
+and a quiet failure in accounts payable is a wrong payment.</p>
+</div>
+
+<h2>0 · Before you start</h2>
+<p>Everything is already running. Confirm with:</p>
+<pre><span class="c"># all four services should say "Up"</span>
+docker compose ps</pre>
+<table>
+<tr><th>Service</th><th>URL</th><th>What it is</th></tr>
+<tr><td>web</td><td><code>http://localhost:3000</code></td><td>The review screen — start here</td></tr>
+<tr><td>api</td><td><code>http://localhost:8001/docs</code></td><td>Pipeline API (interactive OpenAPI docs)</td></tr>
+<tr><td>accounting</td><td><code>http://localhost:8080</code></td><td>The client's system, run <strong>verbatim</strong> from the brief</td></tr>
+<tr><td>db</td><td><code>localhost:5433</code></td><td>PostgreSQL — audit trail and review queue</td></tr>
+</table>
+<div class="box warn"><p><strong>Why 8001 and 5433?</strong> Your machine already has something on 8000 and a native
+PostgreSQL on 5432. Rather than ask you to stop them, the container publishes on the next port up. Inside the
+compose network the services still talk on 8000 and 5432.</p></div>
+
+<h2>1 · The dashboard — where everything landed</h2>
+<p><span class="step">1</span>Open <code>http://localhost:3000</code></p>
+
+<div class="expect avoid"><h4>What you should see</h4>
+<table>
+<tr><th>Count</th><th>Group</th><th>Meaning</th></tr>
+<tr><td class="n">7</td><td><span class="pill p-ok">REGISTERED</span></td><td>Passed every check. No human involved.</td></tr>
+<tr><td class="n">3</td><td><span class="pill p-rev">NEEDS REVIEW</span></td><td>A check failed, or policy requires a person.</td></tr>
+<tr><td class="n">2</td><td><span class="pill p-blk">BLOCKED</span></td><td>Cannot be registered at all.</td></tr>
+</table>
+<p style="margin:0"><strong>10 of 12 will end up registered.</strong> Not 12 — and that is the correct answer.</p></div>
+
+<p>Notice the ordering: <strong>blocked first, registered last</strong>. The queue is sorted by what a human has to
+decide, not by arrival time. The things nobody can action from this screen are at the top.</p>
+
+<h3>Read the stat cards</h3>
+<ul>
+<li><strong>Auto-pass rate</strong> — the only metric that decides whether this pays for itself. The AI costs
+less than half a cent per invoice; <em>review minutes</em> are the real cost.</li>
+<li><strong>Extraction cost</strong> — measured live from OpenRouter's billing, not estimated.</li>
+<li><strong>In accounting</strong> — read back live from <code>GET /invoices</code> on the client's system, so it
+cannot drift from what actually registered.</li>
+</ul>
+<div class="box warn"><p><strong>Don't read 58% as a production number.</strong> Five of these twelve invoices are
+deliberately broken. A real month is mostly repeat suppliers with stable layouts.</p></div>
+
+<h2>2 · Flow A — the duplicate <span class="pill p-blk">BLOCKED</span></h2>
+<p><em>This is the failure the CEO's email describes, planted in the sample data.</em></p>
+<p><span class="step">1</span>Click <code>invoice_07.jpg</code> in the Blocked group.</p>
+
+<div class="expect avoid"><h4>What to look for</h4>
+<ul>
+<li>Banner: <strong>BLOCKER · dedupe.exact</strong> — "Already registered: invoice YM-2026-0107 for this supplier
+was posted as ACC-0001 from <strong>invoice_01.pdf</strong>"</li>
+<li>Scroll to <strong>All checks</strong> — <strong>every single one passes.</strong> The reading is perfect.</li>
+<li>The <strong>Approve &amp; register</strong> button is greyed out.</li>
+</ul></div>
+
+<p><strong>Why this matters.</strong> invoice_07 is a scan of invoice_01 — same supplier, same invoice number, same
+¥334,400. Extraction accuracy would never have caught it, because nothing was misread. It is caught by checking our
+own records <em>before</em> calling the accounting system, which means the reviewer is told <em>which</em> invoice it
+duplicates rather than just seeing a failure.</p>
+
+<p><span class="step">2</span>Try to force it through — confirm a blocker is not an opinion:</p>
+<pre>curl -s -X POST localhost:8001/api/invoices/7/approve \
+  -H 'Content-Type: application/json' -d '{"actor":"you","note":"force it"}' | python3 -m json.tool</pre>
+<div class="expect"><h4>Expected</h4><p><code>HTTP 409</code> naming the conflicting record. The UI button being
+disabled is a courtesy; the <em>API</em> is the thing that refuses.</p></div>
+
+<h2>3 · Flow B — the unknown supplier <span class="pill p-blk">BLOCKED</span></h2>
+<p><span class="step">1</span>Open <code>invoice_10.jpg</code>.</p>
+<div class="expect avoid"><h4>What to look for</h4>
+<ul>
+<li><strong>BLOCKER · partner.resolved</strong> — 新星ロジスティクス株式会社 is not in the partner master.</li>
+<li>Supplier dropdown reads <strong>&mdash; not resolved &mdash;</strong>. There is no correct value to pick.</li>
+</ul></div>
+<p><strong>Why it is blocked rather than guessed.</strong> Only suppliers in <code>GET /partners</code> can be
+registered, so there is literally no <code>partner_code</code> to post against. The system will never auto-create a
+payee record — creating one is how invoice fraud succeeds. Someone with authority must add the supplier deliberately.</p>
+<p class="avoid"><strong>At scale this is the #1 queue filler</strong> — not OCR errors. Every new supplier, renamed
+entity and subsidiary stops here. It is the top item in "what I'd do with another 8 hours".</p>
+
+<h2>4 · Flow C — handwriting that matters vs. handwriting that doesn't</h2>
+<p><em>The sharpest judgement call in the build. Two invoices carry pen; they get different outcomes on purpose.</em></p>
+
+<p><span class="step">1</span>Open <code>invoice_04.jpg</code> — it is in the <strong>Registered</strong> group.</p>
+<div class="expect"><h4>Expected</h4><p>It auto-posted, but <code>handwriting.detected</code> shows as a
+<strong>WARN</strong>: a 受領 ("received") stamp. Workflow noise. It cost nobody any time.</p></div>
+
+<p><span class="step">2</span>Open <code>invoice_08.jpg</code> in <strong>Needs review</strong>. Look at the document
+image — find the <strong>red pen on the bank account line</strong> (「…に変更」).</p>
+<div class="expect avoid"><h4>Expected — two handwriting checks, different severities</h4>
+<ul>
+<li><strong>ERROR · handwriting.on_payment_details</strong> — must be confirmed with the supplier</li>
+<li><strong>WARN · handwriting.detected</strong> — also picked up the 至急 ("urgent") stamp separately</li>
+</ul></div>
+<div class="box key"><p><strong>The point:</strong> bank details are <em>not part of the accounting API's payload at
+all</em>. If this pipeline did not flag it, <strong>nothing downstream ever would</strong>. A changed payee account is
+the classic invoice-fraud vector. A system that treated "has handwriting" as one signal would either block everything
+or miss this.</p></div>
+
+<h2>5 · Flow D — the supplier's own invoice is wrong <span class="pill p-rev">REVIEW</span></h2>
+<p><em>The best case in the set: the extraction is perfect and the document is defective.</em></p>
+<p><span class="step">1</span>Open <code>invoice_09.pdf</code>.</p>
+
+<div class="expect avoid"><h4>What to look for — the live recalculation block</h4>
+<table>
+<tr><th>Line</th><th>Value</th></tr>
+<tr><td>Subtotal from lines</td><td class="n">¥134,088</td></tr>
+<tr><td>Tax 10% on ¥134,088 (rounded down)</td><td class="n">¥13,408</td></tr>
+<tr><td><strong>Total the accounting system will store</strong></td><td class="n"><strong>¥147,496</strong></td></tr>
+<tr><td><strong>Total printed on the document</strong></td><td class="n"><strong>¥147,497</strong></td></tr>
+</table></div>
+
+<p><strong>What happened.</strong> The supplier floored the tax on the tax line (13,408.8 → 13,408) but rounded it
+<em>up</em> when computing the total. Their invoice is internally inconsistent by ¥1. This is a defect in the
+document, not in the reading of it — the model transcribed 147,497 faithfully, exactly as instructed, instead of
+"helpfully" correcting it and destroying the evidence.</p>
+
+<p><strong>Why this is the strongest argument for the design.</strong> A human keying this in would have typed
+147,497 straight through. The accounting system recalculates from the line items and would have rejected it. The
+check catches a <em>supplier</em> error, not just an AI error.</p>
+
+<p><span class="step">2</span>Type a note in the <strong>Note</strong> field, then click <strong>Approve &amp; register</strong>.</p>
+<div class="expect"><h4>Expected</h4><p>Status flips to <span class="pill p-ok">POSTED</span> with an accounting ID.
+It registers <strong>¥147,496</strong> — the recalculated figure, not the printed one.</p></div>
+
+<p><span class="step">3</span>Confirm what actually landed in the client's system:</p>
+<pre>curl -s -H 'X-API-Key: demo-key-1234' localhost:8080/invoices \
+  | python3 -c "import json,sys; [print(r) for r in json.load(sys.stdin)['data']['invoices'] if r['invoice_number']=='OSK-26-0128']"</pre>
+<div class="expect"><h4>Expected</h4><p><code>"total_amount": 147496</code></p></div>
+
+<h3>Try editing before you approve</h3>
+<p>Change any <strong>Amount</strong> in the line items table and watch the recalculation update as you type. This is
+the accounting system's <em>own</em> arithmetic — tax per code, rounded down — reproduced in the browser, so a
+correction that the API would reject is visible <em>before</em> you save it.</p>
+
+<h2>6 · Flow E — a policy stop, not a doubt <span class="pill p-rev">REVIEW</span></h2>
+<p><span class="step">1</span>Open <code>invoice_02.pdf</code>.</p>
+<div class="expect avoid"><h4>Expected</h4>
+<ul>
+<li>Only one failed check: <strong>ERROR · amount.threshold</strong> — ¥1,560,988 exceeds the ¥1,000,000 auto-approval limit.</li>
+<li>Everything else passes. Scroll the document — <strong>26 line items across 2 pages</strong>, with the totals printed
+only on page 2, all read correctly.</li>
+</ul></div>
+<p>This one is not stopped because the machine is unsure. It is stopped because a finance team would demand a human on
+large amounts regardless of confidence. That is a <strong>policy dial</strong>, not a correctness check — set via
+<code>AMOUNT_REVIEW_THRESHOLD_JPY</code> in <code>.env</code>.</p>
+<p>So the three review items are three <em>different kinds</em> of reason: a document defect (09), a fraud-shaped
+annotation (08), and a policy control (02).</p>
+
+<h2>7 · The audit trail — how you'd find a bad registration</h2>
+<p>After approving, check who accepted responsibility for what:</p>
+<pre>docker compose exec -T db psql -U invoice -d invoice -c \
+  "select i.invoice_number, r.actor, r.action, r.note from review_events r
+     join invoices i on i.id=r.invoice_id order by r.id;"</pre>
+<div class="expect"><h4>Expected</h4><p>Each approval records the actor, the note, <strong>and which checks they
+overrode</strong> — e.g. <code>overrode 1 check(s): arithmetic.total</code>. "Registered because a person overrode the
+totals check" is a query, not an investigation.</p></div>
+
+<p>Three tables exist purely for this: <code>check_results</code> (every verification decision),
+<code>postings</code> (the exact bytes sent and received), <code>review_events</code> (who changed what, and what it
+looked like before). Any figure in the ledger traces back to the pixels it came from.</p>
+
+<h2>8 · Idempotency — run it twice</h2>
+<p>The brief invites you to retry as often as you like. A pipeline that double-registers on a second run would
+reproduce the client's original complaint.</p>
+<pre>docker compose exec api python -m app.cli ingest</pre>
+<div class="expect"><h4>Expected</h4><p><code>processed 0 new document(s)</code> — every file is skipped. Documents are
+keyed by SHA-256 of their bytes, so re-ingesting is a no-op. Nothing is registered twice.</p></div>
+
+<h2>9 · The test suite — verification without the AI</h2>
+<pre>cd backend &amp;&amp; .venv/bin/python -m pytest -q</pre>
+<div class="expect"><h4>Expected</h4><p><strong>86 passed in ~0.2s.</strong> No LLM, no database, no network.</p></div>
+<p>The important one is <code>tests/test_ground_truth.py</code>: it pushes the <em>correct</em> transcription of all 12
+invoices (hand-transcribed in <code>evals/ground_truth.yaml</code>) through the real check ladder and asserts each one
+routes to the right place. When it fails, the business logic is wrong — not the model having a bad day.</p>
+
+<h2>10 · The model comparison</h2>
+<pre><span class="c"># costs a few cents; results already recorded in evals/results/</span>
+make eval</pre>
+<table>
+<tr><th>Model</th><th>Field acc.</th><th>Perfect</th><th>$/invoice</th><th>Verdict</th></tr>
+<tr><td><strong>gemini-3.7-flash</strong></td><td class="n">100%</td><td class="n">12/12</td><td class="n">$0.0037</td><td><strong>chosen</strong></td></tr>
+<tr><td>claude-sonnet-5</td><td class="n">100%</td><td class="n">12/12</td><td class="n">$0.0200</td><td>5.4× the price, identical result</td></tr>
+<tr><td>gemini-2.5-flash-lite</td><td class="n">98.7%</td><td class="n">10/12</td><td class="n">$0.0005</td><td>7× cheaper, one real error</td></tr>
+<tr><td>gemma-4-31b-it:free</td><td class="n">0%</td><td class="n">0/12</td><td class="n">$0.0000</td><td>HTTP 429 on 11 of 12 calls</td></tr>
+</table>
+
+<div class="box key"><p><strong>The finding worth reading.</strong> On invoice_08 the cheap model read the tax total as
+<strong>9,036</strong> where the page prints <strong>8,936</strong> — while its <em>own</em> tax breakdown rows
+(680 + 8,256) sum to 8,936. It contradicted itself by one digit. <code>arithmetic.tax_per_code</code> caught it
+instantly, with no second model call, because the invoice prints its own tax breakdown and the document therefore
+contains everything needed to detect the error. That is what makes a 7×-cheaper model a real option rather than a
+gamble.</p></div>
+
+<h2>11 · Start over</h2>
+<pre><span class="c"># clear our records and the accounting ledger, keep the containers</span>
+curl -X POST localhost:8001/api/admin/reset
+curl -X POST localhost:8001/api/admin/ingest   <span class="c"># ~2.5 min</span>
+
+<span class="c"># or a full clean rebuild from nothing</span>
+docker compose down -v &amp;&amp; docker compose up --build</pre>
+<p>On a clean rebuild the API is reachable in about 15 seconds and the dashboard fills in as invoices are processed —
+seeding runs in the background rather than blocking startup.</p>
+
+<h2>Quick reference — all 12 invoices</h2>
+<table>
+<tr><th>File</th><th>Outcome</th><th>The trap it tests</th></tr>
+<tr><td>invoice_01.pdf</td><td><span class="pill p-ok">AUTO</span></td><td>baseline, PDF with text layer</td></tr>
+<tr><td>invoice_02.pdf</td><td><span class="pill p-rev">REVIEW</span></td><td>26 line items over 2 pages; over the amount limit</td></tr>
+<tr><td>invoice_03.pdf</td><td><span class="pill p-ok">AUTO</span></td><td>mixed 8%/10% tax, floor rounding 6,067.2→6,067</td></tr>
+<tr><td>invoice_04.jpg</td><td><span class="pill p-ok">AUTO</span></td><td>handwritten 受領 stamp (harmless); slash dates</td></tr>
+<tr><td>invoice_05.jpg</td><td><span class="pill p-ok">AUTO</span></td><td>式 rows with null quantity and unit price</td></tr>
+<tr><td>invoice_06.jpg</td><td><span class="pill p-ok">AUTO</span></td><td>supplier printed as a katakana <em>alias</em></td></tr>
+<tr><td>invoice_07.jpg</td><td><span class="pill p-blk">BLOCKED</span></td><td><strong>duplicate of 01</strong> — the CEO's email</td></tr>
+<tr><td>invoice_08.jpg</td><td><span class="pill p-rev">REVIEW</span></td><td><strong>red pen on the bank account</strong></td></tr>
+<tr><td>invoice_09.pdf</td><td><span class="pill p-rev">REVIEW</span></td><td>no text layer; <strong>printed total off by ¥1</strong></td></tr>
+<tr><td>invoice_10.jpg</td><td><span class="pill p-blk">BLOCKED</span></td><td><strong>supplier not in the master</strong></td></tr>
+<tr><td>invoice_11.jpg</td><td><span class="pill p-ok">AUTO</span></td><td>Japanese era dates 令和8年 → 2026</td></tr>
+<tr><td>invoice_12.jpg</td><td><span class="pill p-ok">AUTO</span></td><td>negative line 値引き printed as △30,000</td></tr>
+</table>
+
+<footer>Invoice Intake — take-home submission by Sifat Sikder. Full reasoning in <code>SUBMISSION.md</code>;
+how to run it in <code>README.md</code>; 3-minute demo script in <code>docs/DEMO.md</code>.</footer>
+</body></html>

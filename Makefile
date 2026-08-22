@@ -43,3 +43,8 @@ dev-api:       ## run the API against a local Postgres on 5433
 
 dev-web:
 	cd web && npm run dev
+
+guide:         ## regenerate docs/TESTING_GUIDE.pdf from its HTML source
+	"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --disable-gpu \
+	  --no-pdf-header-footer --print-to-pdf="$(PWD)/docs/TESTING_GUIDE.pdf" \
+	  "file://$(PWD)/docs/TESTING_GUIDE.html"
