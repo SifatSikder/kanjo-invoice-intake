@@ -419,8 +419,8 @@ def run_checks(
             "handwriting.on_payment_details",
             Severity.ERROR,
             not invoice.handwriting_affects_payment,
-            "Handwriting alters payment/bank details -- must be confirmed with the "
-            "supplier before payment"
+            "Handwriting alters payment or bank details \u2014 confirm with the "
+            "supplier before paying"
             if invoice.handwriting_affects_payment
             else "No handwriting on payment details",
             {"notes": invoice.handwriting_notes}
