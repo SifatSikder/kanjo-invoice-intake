@@ -1,0 +1,12 @@
+.env
+.env.local
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+.next/
+.DS_Store
+evals/results/
+
+# Internal working docs — not part of the submission
+PLAN.md
