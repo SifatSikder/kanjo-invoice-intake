@@ -2,7 +2,7 @@ import type { Invoice, Partner, Stats, Summary } from "./types";
 
 // Server components run inside the container and reach the API by service name;
 // the browser goes through the Next rewrite. One helper covers both.
-const SERVER_BASE = process.env.API_BASE || "http://localhost:8000";
+const SERVER_BASE = process.env.API_BASE || "http://localhost:8001";
 const isServer = typeof window === "undefined";
 
 async function get<T>(path: string): Promise<T> {

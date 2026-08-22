@@ -4,7 +4,7 @@ const nextConfig = {
   // The browser talks to the API through this rewrite, so the page works
   // identically whether it is served from Docker or from `npm run dev`.
   async rewrites() {
-    const target = process.env.API_BASE || "http://localhost:8000";
+    const target = process.env.API_BASE || "http://localhost:8001";
     return [{ source: "/api/:path*", destination: `${target}/api/:path*` }];
   },
 };

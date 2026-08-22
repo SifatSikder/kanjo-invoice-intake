@@ -61,7 +61,8 @@ services:
       - ./invoices:/data/invoices:ro
       - storage:/data/storage
     ports:
-      - "8000:8000"
+      # 8001 on the host: 8000 is a common default and is often already taken.
+      - "8001:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -73,7 +74,7 @@ services:
       context: ./web
     environment:
       # Browser-side calls go to the host-published port; server-side to the network alias.
-      NEXT_PUBLIC_API_BASE: http://localhost:8000
+      NEXT_PUBLIC_API_BASE: http://localhost:8001
       API_BASE: http://api:8000
     ports:
       - "3000:3000"
