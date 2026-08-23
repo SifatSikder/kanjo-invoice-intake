@@ -99,20 +99,32 @@ a:hover { color: var(--brand-2); }
 
 .wrap { max-width: 1320px; margin: 0 auto; padding: 0 28px 96px; }
 
+@media (max-width: 640px) {
+  .wrap { padding: 0 16px 64px; }
+  .masthead-in { padding: 0 16px; }
+  h1 { font-size: 22px; }
+  .cards { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+  .field { grid-template-columns: 1fr; gap: 5px; }
+  .t-wrap { overflow-x: auto; }
+}
+
 /* ---------------------------------------------------------------- brand --- */
+/* The masthead and .wrap must share one content edge, so both are a 1320px
+   box with the padding INSIDE it. Padding outside the inner box (the obvious
+   way to write this) makes the header start 28px left of the page it heads. */
 .masthead {
   position: sticky;
   top: 0;
   z-index: 40;
-  margin: 0 -28px 26px;
-  padding: 14px 28px;
+  margin-bottom: 26px;
+  padding: 14px 0;
   background: rgba(247, 248, 252, 0.72);
   backdrop-filter: var(--blur);
   -webkit-backdrop-filter: var(--blur);
   border-bottom: 1px solid var(--line);
 }
 .masthead-in {
-  max-width: 1320px; margin: 0 auto;
+  max-width: 1320px; margin: 0 auto; padding: 0 28px;
   display: flex; align-items: center; gap: 12px;
 }
 .mark {
@@ -120,9 +132,18 @@ a:hover { color: var(--brand-2); }
   background: linear-gradient(140deg, var(--brand), var(--brand-2));
   box-shadow: 0 4px 14px -4px rgba(79, 70, 229, 0.6), var(--inset-hi);
   display: grid; place-items: center;
-  color: #fff; font-weight: 700; font-size: 15px; letter-spacing: -0.5px;
+  font-weight: 700; font-size: 15px; letter-spacing: -0.5px;
   flex-shrink: 0;
+  transition: transform 0.3s var(--spring), box-shadow 0.3s var(--glide);
 }
+/* Both marks are links, so the global a:hover would recolour them -- white on a
+   violet gradient becomes violet on violet, and the character vanishes. */
+.mark, .mark:hover, .mark:visited { color: #fff; }
+.mark:hover {
+  transform: translateY(-1px) scale(1.04);
+  box-shadow: 0 7px 20px -4px rgba(79, 70, 229, 0.72), var(--inset-hi);
+}
+.wordmark, .wordmark:hover, .wordmark:visited { color: var(--ink); }
 .wordmark { font-size: 17px; font-weight: 650; letter-spacing: -0.35px; }
 .wordmark .jp { color: var(--muted); font-weight: 500; margin-left: 7px; font-size: 13.5px; }
 .masthead .spacer { flex: 1; }

@@ -20,7 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="mark" aria-hidden tabIndex={-1}>
               勘
             </Link>
-            <Link href="/" className="wordmark" style={{ color: "var(--ink)" }}>
+            <Link href="/" className="wordmark">
               Kanjo
               <span className="jp">勘定</span>
             </Link>
