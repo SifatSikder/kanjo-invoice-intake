@@ -96,5 +96,23 @@ curl -H 'X-API-Key: demo-key-1234' localhost:8080/invoices | jq '.data.invoices[
 
 ## Fallback: screenshots
 
-`docs/screenshots/` has the four shots this script walks through, if a video is
-not practical.
+`docs/screenshots/` covers the same ground, if a video is not practical:
+
+| File | Shows |
+|---|---|
+| `01-upload-screen.png` | What you get on a cold start — an empty drop zone |
+| `02-being-read.png` | Twelve invoices mid-flight, updating themselves |
+| `03-dashboard.png` | The settled queue: 7 filed · 3 waiting on you · 2 can't be filed |
+| `04-blocked-duplicate.png` | invoice_07 refused, naming the invoice it duplicates |
+| `05-review-handwriting.png` | invoice_08 held because pen altered the bank account |
+| `06-review-document-defect.png` | invoice_09's own total off by ¥1, caught before posting |
+
+## If something misbehaves mid-demo
+
+The accounting system holds its ledger **in memory**. If that container restarts,
+its ledger empties while our database still shows invoices as registered. Resync
+both with:
+
+```bash
+curl -X POST localhost:8001/api/admin/reset
+```

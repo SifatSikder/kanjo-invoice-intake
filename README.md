@@ -101,6 +101,11 @@ make dev-api                       # :8001
 make dev-web                       # :3000
 ```
 
+### Seeing it without running it
+
+`docs/screenshots/` has the whole flow captured, and `docs/TESTING_GUIDE.pdf`
+walks every case step by step with what to expect and why.
+
 ---
 
 ## How it works

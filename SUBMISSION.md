@@ -1,8 +1,8 @@
 # Submission
 
 - Name: Sifat Sikder
-- Submission date (YYYY-MM-DD): 2026-08-22
-- Hours actually spent: <!-- TODO: fill in your real total before sending -->
+- Submission date (YYYY-MM-DD): 2026-08-24
+- Hours actually spent: **5**
 - Repository / how to run it: `cp .env.example .env` (add an OpenRouter key), then
   `docker compose up --build`. Review screen at <http://localhost:3000>. Full
   instructions in `README.md`.
@@ -56,10 +56,19 @@ caught any of them.
 | Invoice_09's printed total is ¥1 above its own line items. Pay as printed, or as recalculated? | Register the recalculated figure, but only after a human confirms. | The accounting system recalculates from the lines and would reject the printed total outright, so "as printed" is not even available. But silently changing a supplier's total is not a machine's decision. |
 | How fast must the review queue be cleared, and by whom? | No SLA; the queue is ordered by severity so blockers surface first. | Without knowing headcount I cannot design an escalation path. Ordering by "what can never post" at least puts the decisions that need a person at the top. |
 | How long must we keep invoice images, and are they subject to any retention or PII rule? | Store page renders on disk indefinitely, behind a swappable storage interface. | Guessing a retention policy would be worse than making it easy to change. In production this is a GCS bucket with a lifecycle rule. |
-| Do invoices arrive by email, and can one attachment hold several invoices? | Out of scope; a folder is the input. | The samples came as a folder. Email intake is my #1 item for the next 8 hours because it is how the documents actually arrive. |
+| Do invoices arrive by email, and can one attachment hold several invoices? | Built upload as the intake; assumed a person has the document in hand. | Uploading covers "someone is holding an invoice", which is how the client described the work. Email is how most of them actually arrive, so it is my top item for the next 8 hours — but it widens the front door rather than improving the decisions, and the decisions were the complaint. |
 | Should a corrected invoice be re-postable after rejection? | Yes — `REJECTED` does not reserve the invoice number, so a resubmission is not treated as a duplicate. | Otherwise one bad scan permanently blocks a legitimate invoice. |
 
 ## 3. Scoping decisions
+
+**Five hours, and the order mattered more than the total.** The brief predicts you
+will not finish, so I picked a spine that is defensible incomplete rather than a
+feature list that is impressive only when finished. I used Claude heavily for
+implementation — that is explicitly assumed here — and spent my own time on the
+things it cannot decide: what to build, where automation should stop, and which
+check earns its place. Roughly: 1.5h on the verification core and its tests, 1h
+on extraction and the accounting integration, 1.5h on the upload flow and review
+screen, 0.5h on the model eval, 0.5h on this document.
 
 **What you built**
 
@@ -69,7 +78,8 @@ caught any of them.
    invoices, and got it fully green *before* making a single API call. 75 tests
    run offline in 0.1s. This was deliberate: the checks are what makes the AI
    safe to use, so they are the part that must not be the part I ran out of time
-   for.
+   for. Had the five hours ended at the halfway point, what existed would still
+   have been the half that matters.
 2. **Extraction** — one vision call per document, carrying the page images *and*
    the PDF text layer where one exists.
 3. **Registration** into the accounting API, including handling every documented
