@@ -34,7 +34,12 @@ from app.pipeline.orchestrator import (
     load_invoice,
     process_accepted,
 )
-from app.pipeline.render import SUPPORTED_SUFFIXES_HINT, RenderedDocument
+from app.pipeline.render import (
+    SUPPORTED_SUFFIXES_HINT,
+    IncompleteDocument,
+    RenderedDocument,
+    assert_complete,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["upload"])
@@ -123,7 +128,17 @@ async def upload_documents(files: list[UploadFile] = File(...)) -> dict:
                 continue
 
             try:
+                # An upload is the one path where the bytes can arrive partial.
+                assert_complete(tmp)
                 result = await accept_document(session, tmp, config=settings)
+            except IncompleteDocument as exc:
+                logger.warning("rejected incomplete upload %s: %s", name, exc)
+                shutil.rmtree(tmp.parent, ignore_errors=True)
+                accepted.append({
+                    "filename": name, "accepted": False,
+                    "reason": f"{exc}. Please upload it again.",
+                })
+                continue
             except Exception as exc:  # noqa: BLE001 - a corrupt file is a user error
                 logger.exception("could not read %s", name)
                 shutil.rmtree(tmp.parent, ignore_errors=True)

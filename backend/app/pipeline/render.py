@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pypdfium2 as pdfium
-from PIL import Image, ImageOps
+from PIL import Image, ImageFile, ImageOps
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +69,50 @@ class RenderedDocument:
     @property
     def has_text_layer(self) -> bool:
         return len(self.text_layer.strip()) >= TEXT_LAYER_MIN_CHARS
+
+
+class IncompleteDocument(ValueError):
+    """The file we received is not a whole document."""
+
+
+def assert_complete(path: Path) -> None:
+    """Reject a file that arrived truncated.
+
+    An interrupted upload -- a dropped connection, a closed tab, a server
+    restarting mid-request -- can leave a partial file that still parses. A PDF
+    cut short often renders its first page perfectly while its later pages and
+    its trailer are missing, so nothing downstream notices: the invoice enters
+    the queue looking complete, with line items silently absent. In an
+    accounts-payable pipeline that is a wrong total presented as a right one.
+
+    Both checks look at the end of the file, because that is what truncation
+    removes: a PDF must carry its %%EOF trailer, and an image must survive a
+    full structural decode.
+    """
+    if not path.exists() or path.stat().st_size == 0:
+        raise IncompleteDocument("the file is empty")
+
+    if path.suffix.lower() == ".pdf":
+        with path.open("rb") as fh:
+            fh.seek(max(0, path.stat().st_size - 2048))
+            if b"%%EOF" not in fh.read():
+                raise IncompleteDocument(
+                    "the PDF is missing its end-of-file marker, so it arrived incomplete"
+                )
+        return
+
+    # `verify()` only inspects structure and happily passes a half-received JPEG.
+    # `load()` decodes the actual pixel data, which is what truncation destroys.
+    # Pillow's LOAD_TRUNCATED_IMAGES must stay False for it to raise.
+    previous = ImageFile.LOAD_TRUNCATED_IMAGES
+    ImageFile.LOAD_TRUNCATED_IMAGES = False
+    try:
+        with Image.open(path) as probe:
+            probe.load()
+    except Exception as exc:  # noqa: BLE001 - any decode failure means unusable
+        raise IncompleteDocument(f"the image is incomplete or unreadable ({exc})") from exc
+    finally:
+        ImageFile.LOAD_TRUNCATED_IMAGES = previous
 
 
 def sha256_of(path: Path) -> str:

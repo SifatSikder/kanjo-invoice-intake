@@ -398,25 +398,16 @@ export function ReviewEditor({
           </div>
         )}
 
-        {/* A clerk does not need twenty lines telling them nothing is wrong. One
-            line says it; the detail stays available for anyone auditing later. */}
-        <details className="panel checks-detail">
-          <summary>
-            <span className="ok-dot" aria-hidden />
-            {failed.length === 0
-              ? `All ${passed.length} checks passed`
-              : `${passed.length} other checks passed`}
-            <span className="reveal">show them</span>
-          </summary>
-          <ul className="passed-list">
-            {passed.map((c) => (
-              <li key={c.name}>
-                {describe(c).title}
-                <code>{c.name}</code>
-              </li>
-            ))}
-          </ul>
-        </details>
+        {/* One line, not twenty. Knowing the machine checked thoroughly is worth
+            saying; listing twenty things that are fine is not something anyone
+            acts on. Every verdict is still written to check_results, so an
+            auditor can reconstruct exactly what was tested and why it passed. */}
+        <p className="checks-summary">
+          <span className="ok-dot" aria-hidden />
+          {failed.length === 0
+            ? `All ${passed.length} checks passed`
+            : `${passed.length} other checks passed`}
+        </p>
       </div>
     </div>
   );

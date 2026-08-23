@@ -16,8 +16,12 @@ async function proxy(request: Request, path: string[]) {
   const url = new URL(request.url);
   const target = `${API_BASE()}/api/${path.join("/")}${url.search}`;
 
+  // Starlette does not auto-route HEAD, so a HEAD forwarded as-is would 405
+  // even where GET works. Fetch with GET and return the headers without a body,
+  // which is what HEAD is supposed to mean.
+  const isHead = request.method === "HEAD";
   const init: RequestInit = {
-    method: request.method,
+    method: isHead ? "GET" : request.method,
     headers: { "Content-Type": request.headers.get("content-type") || "application/json" },
     cache: "no-store",
   };
@@ -30,11 +34,20 @@ async function proxy(request: Request, path: string[]) {
     const headers = new Headers();
     const contentType = upstream.headers.get("content-type");
     if (contentType) headers.set("content-type", contentType);
-    // Page images are content-addressed by document hash and never change.
+    // Page images must revalidate, not be cached hard. The URL is keyed by
+    // invoice id, not by content hash, and ids restart at 1 after a reset -- so
+    // an "immutable" cache would happily show the previous invoice_01 in place
+    // of the current one. The upstream FileResponse sends an ETag, so
+    // revalidation costs a 304 and returns the right image every time.
     if (contentType?.startsWith("image/")) {
-      headers.set("cache-control", "public, max-age=31536000, immutable");
+      headers.set("cache-control", "no-cache");
+      const etag = upstream.headers.get("etag");
+      if (etag) headers.set("etag", etag);
     }
-    return new Response(upstream.body, { status: upstream.status, headers });
+    return new Response(isHead ? null : upstream.body, {
+      status: upstream.status,
+      headers,
+    });
   } catch (error) {
     return Response.json(
       { detail: `cannot reach the pipeline API at ${API_BASE()}: ${error}` },
@@ -46,6 +59,10 @@ async function proxy(request: Request, path: string[]) {
 type Ctx = { params: Promise<{ path: string[] }> };
 
 export async function GET(request: Request, ctx: Ctx) {
+  return proxy(request, (await ctx.params).path);
+}
+// Browsers and caches issue HEAD for images; without it they get a 405.
+export async function HEAD(request: Request, ctx: Ctx) {
   return proxy(request, (await ctx.params).path);
 }
 export async function POST(request: Request, ctx: Ctx) {
