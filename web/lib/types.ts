@@ -24,6 +24,7 @@ export interface Invoice {
   status: string;
   filename: string;
   document_id: number;
+  document_sha: string;
   page_count: number;
   partner_code: string | null;
   partner_name_raw: string | null;

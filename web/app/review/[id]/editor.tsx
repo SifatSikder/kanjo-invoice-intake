@@ -54,7 +54,6 @@ export function ReviewEditor({
   const failed = invoice.checks
     .filter((c) => !c.passed)
     .sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]);
-  const passed = invoice.checks.filter((c) => c.passed);
   const blockers = failed.filter((c) => c.severity === "BLOCKER");
   const isPosted = invoice.status === "POSTED";
 
@@ -142,7 +141,11 @@ export function ReviewEditor({
           {Array.from({ length: invoice.page_count }, (_, i) => (
             <img
               key={i}
-              src={`/api/invoices/${invoice.id}/pages/${i + 1}`}
+              // Versioned by the document's content hash. Invoice ids restart
+              // at 1 after a reset, so an id-only URL can serve a cached image
+              // of a completely different invoice -- which is a reviewer
+              // approving one document while looking at another.
+              src={`/api/invoices/${invoice.id}/pages/${i + 1}?v=${invoice.document_sha.slice(0, 12)}`}
               alt={`${invoice.filename} page ${i + 1}`}
               style={{ marginBottom: i + 1 < invoice.page_count ? 10 : 0 }}
             />
@@ -398,16 +401,11 @@ export function ReviewEditor({
           </div>
         )}
 
-        {/* One line, not twenty. Knowing the machine checked thoroughly is worth
-            saying; listing twenty things that are fine is not something anyone
-            acts on. Every verdict is still written to check_results, so an
-            auditor can reconstruct exactly what was tested and why it passed. */}
-        <p className="checks-summary">
-          <span className="ok-dot" aria-hidden />
-          {failed.length === 0
-            ? `All ${passed.length} checks passed`
-            : `${passed.length} other checks passed`}
-        </p>
+        {/* Nothing is shown for checks that passed. The status already says the
+            invoice registered, which is exactly what "the checks passed" means --
+            restating it adds a line without adding information. Only failures
+            get surfaced, because only failures need a decision. Every verdict is
+            still written to check_results for anyone auditing later. */}
       </div>
     </div>
   );

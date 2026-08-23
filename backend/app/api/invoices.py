@@ -56,6 +56,7 @@ def to_detail(invoice: Invoice) -> InvoiceOut:
         status=invoice.status.value,
         filename=invoice.document.filename,
         document_id=invoice.document_id,
+        document_sha=invoice.document.sha256,
         page_count=invoice.document.page_count,
         partner_code=invoice.partner_code,
         partner_name_raw=invoice.partner_name_raw,

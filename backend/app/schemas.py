@@ -173,6 +173,9 @@ class InvoiceOut(BaseModel):
     status: str
     filename: str
     document_id: int
+    # Content hash of the source file. Used to version the page-image URL so a
+    # cached image can never belong to a different document.
+    document_sha: str
     page_count: int
     partner_code: str | None
     partner_name_raw: str | None

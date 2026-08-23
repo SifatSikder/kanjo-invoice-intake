@@ -163,19 +163,6 @@ tr.pending td { color: var(--muted); }
   border: 0;
 }
 
-/* --------------------------------------------------- checks-passed line --
-   One quiet line. That the machine ran every check is worth stating; the
-   individual verdicts are audit data, not something a reviewer acts on, and
-   they live in check_results. */
-.checks-summary {
-  display: flex; align-items: center; gap: 8px;
-  margin: 14px 0 0; padding: 0 2px;
-  font-size: 12.5px; color: var(--muted);
-}
-.ok-dot {
-  width: 7px; height: 7px; border-radius: 50%; background: var(--ok);
-  flex-shrink: 0; display: inline-block;
-}
 
 /* A field the model could not read shows what it is, not a guess. */
 input::placeholder { color: #b3bbc7; font-style: italic; }
