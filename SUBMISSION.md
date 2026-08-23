@@ -3,9 +3,10 @@
 - Name: Sifat Sikder
 - Submission date (YYYY-MM-DD): 2026-08-24
 - Hours actually spent: **5**
-- Repository / how to run it: `cp .env.example .env` (add an OpenRouter key), then
-  `docker compose up --build`. Review screen at <http://localhost:3000>. Full
-  instructions in `README.md`.
+- Repository / how to run it: **Kanjo** (勘定). `cp .env.example .env` (add an
+  OpenRouter key), then `docker compose up --build`. Open <http://localhost:3000>
+  and drop an invoice on it. Full instructions in `README.md`; a step-by-step
+  walkthrough of every case in `docs/TESTING_GUIDE.pdf`.
 
 ## 1. Understanding the request
 

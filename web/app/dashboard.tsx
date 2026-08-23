@@ -83,16 +83,19 @@ function Row({ i }: { i: Summary }) {
   );
 }
 
-function Section({ title, blurb, rows }: { title: string; blurb: string; rows: Summary[] }) {
+function Section({
+  title, blurb, rows, index,
+}: { title: string; blurb: string; rows: Summary[]; index: number }) {
   if (!rows.length) return null;
   return (
-    <section>
+    <section className="rise" style={{ ["--i" as string]: index }}>
       <h2>
         {title} <span style={{ color: "var(--muted)" }}>({rows.length})</span>
       </h2>
       <p className="sub" style={{ marginBottom: 10 }}>
         {blurb}
       </p>
+      <div className="t-wrap">
       <table>
         <thead>
           <tr>
@@ -111,6 +114,7 @@ function Section({ title, blurb, rows }: { title: string; blurb: string; rows: S
           ))}
         </tbody>
       </table>
+      </div>
     </section>
   );
 }
@@ -215,22 +219,22 @@ export function Dashboard({
       {stats && !empty && (
         <>
           <div className="cards">
-            <div className="card">
+            <div className="card rise" style={{ ["--i" as string]: 0 }}>
               <div className="n">{stats.auto_posted}</div>
               <div className="l">Filed automatically</div>
               <div className="hint">Nobody had to look at these.</div>
             </div>
-            <div className="card">
+            <div className="card rise" style={{ ["--i" as string]: 1 }}>
               <div className="n">{stats.needs_review}</div>
               <div className="l">Waiting on you</div>
               <div className="hint">Something needs a person before these can be filed.</div>
             </div>
-            <div className="card">
+            <div className="card rise" style={{ ["--i" as string]: 2 }}>
               <div className="n">{stats.blocked}</div>
               <div className="l">Can&rsquo;t be filed</div>
               <div className="hint">These need a decision outside this screen.</div>
             </div>
-            <div className="card">
+            <div className="card rise" style={{ ["--i" as string]: 3 }}>
               <div className="n">{pct}%</div>
               <div className="l">Handled without you</div>
               <div className="hint">
@@ -238,7 +242,7 @@ export function Dashboard({
                 not tokens, are the real cost.
               </div>
             </div>
-            <div className="card">
+            <div className="card rise" style={{ ["--i" as string]: 4 }}>
               <div className="n">${stats.total_cost_usd.toFixed(4)}</div>
               <div className="l">AI cost so far</div>
               <div className="hint">
@@ -249,7 +253,7 @@ export function Dashboard({
                   : "—"}
               </div>
             </div>
-            <div className="card">
+            <div className="card rise" style={{ ["--i" as string]: 5 }}>
               <div className="n">{stats.registered_in_accounting}</div>
               <div className="l">In the accounting system</div>
               <div className="hint">
@@ -266,9 +270,10 @@ export function Dashboard({
         </>
       )}
 
-      {GROUPS.map((g) => (
+      {GROUPS.map((g, n) => (
         <Section
           key={g.key}
+          index={n + 6}
           title={g.title}
           blurb={g.blurb}
           rows={invoices.filter((i) => i.status === g.key)}

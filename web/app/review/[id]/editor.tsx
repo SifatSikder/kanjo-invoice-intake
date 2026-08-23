@@ -18,10 +18,10 @@ const MATCHED_BY: Record<string, string> = {
 };
 
 /** A problem, stated the way a person would state it. */
-function Problem({ c }: { c: Check }) {
+function Problem({ c, index = 0 }: { c: Check; index?: number }) {
   const { title, action, detail } = describe(c);
   return (
-    <div className={`check ${c.severity}`}>
+    <div className={`check ${c.severity}`} style={{ ["--i" as string]: index }}>
       <span className="tag">{SEVERITY_LABEL[c.severity]}</span>
       <div>
         <strong>{title}</strong>
@@ -162,8 +162,8 @@ export function ReviewEditor({
             <h2 style={{ marginTop: 0 }}>
               {blockers.length > 0 ? "This invoice can't be registered" : "Before you approve"}
             </h2>
-            {failed.map((c) => (
-              <Problem key={c.name} c={c} />
+            {failed.map((c, n) => (
+              <Problem key={c.name} c={c} index={n} />
             ))}
           </div>
         )}
@@ -238,6 +238,7 @@ export function ReviewEditor({
 
         <div className="panel">
           <h2 style={{ marginTop: 0 }}>Line items</h2>
+          <div className="t-wrap">
           <table>
             <thead>
               <tr>
@@ -299,7 +300,7 @@ export function ReviewEditor({
                       onChange={(e) => updateLine(i, { amount: Number(e.target.value) })}
                     />
                   </td>
-                  <td style={{ width: 104 }}>
+                  <td style={{ width: 126 }}>
                     <select
                       value={l.tax_code}
                       disabled={isPosted}
@@ -313,6 +314,7 @@ export function ReviewEditor({
               ))}
             </tbody>
           </table>
+          </div>
 
           {/* The same arithmetic the accounting system will apply, run live as you
               type, so a correction that would be rejected is visible before saving. */}

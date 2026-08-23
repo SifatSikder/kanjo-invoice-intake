@@ -60,6 +60,11 @@ export function UploadZone({
           setDragging(true);
         }}
         onDragLeave={() => setDragging(false)}
+        onMouseMove={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          e.currentTarget.style.setProperty("--mx", `${e.clientX - r.left}px`);
+          e.currentTarget.style.setProperty("--my", `${e.clientY - r.top}px`);
+        }}
         onDrop={(e) => {
           e.preventDefault();
           setDragging(false);
@@ -85,13 +90,16 @@ export function UploadZone({
         />
         {busy ? (
           <>
+            <div className="drop-icon" aria-hidden>
+              ↑
+            </div>
             <div className="drop-title">Uploading…</div>
-            <div className="drop-hint">The invoice starts being read as soon as it lands.</div>
+            <div className="drop-hint">Reading starts the moment it lands.</div>
           </>
         ) : (
           <>
             <div className="drop-icon" aria-hidden>
-              ⇪
+              ↑
             </div>
             <div className="drop-title">
               {compact ? "Add more invoices" : "Drop invoices here"}

@@ -1,5 +1,5 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><title>Invoice Intake — Testing Guide</title>
+<html><head><meta charset="utf-8"><title>Kanjo — Testing Guide</title>
 <style>
 @page { size: A4; margin: 15mm 14mm; }
 * { box-sizing: border-box; }
@@ -33,7 +33,7 @@ td.n { text-align:right; font-family:"SF Mono",Menlo,"Hiragino Sans", "Hiragino 
 footer { margin-top:16pt; padding-top:7pt; border-top:1px solid #d9dee6; font-size:8.5pt; color:#7b838f; }
 </style></head><body>
 
-<h1>Invoice Intake — Testing Guide</h1>
+<h1>Kanjo <span style="color:#667;font-weight:400">勘定</span> — testing guide</h1>
 <p class="sub">Step-by-step walkthrough of every flow, with what to expect at each point and why it behaves that way.</p>
 
 <div class="box key">
@@ -54,7 +54,7 @@ pre-loaded</strong> — the app opens on an empty upload screen, which is the po
 <pre>docker compose ps</pre>
 <table>
 <tr><th>Service</th><th>URL</th><th>What it is</th></tr>
-<tr><td>web</td><td><code>http://localhost:3000</code></td><td>The app — start here</td></tr>
+<tr><td>web</td><td><code>http://localhost:3000</code></td><td>Kanjo — start here</td></tr>
 <tr><td>api</td><td><code>http://localhost:8001/docs</code></td><td>Pipeline API (interactive OpenAPI docs)</td></tr>
 <tr><td>accounting</td><td><code>http://localhost:8080</code></td><td>The client's system, run <strong>verbatim</strong> from the brief</td></tr>
 <tr><td>db</td><td><code>localhost:5433</code></td><td>PostgreSQL — audit trail and review queue</td></tr>

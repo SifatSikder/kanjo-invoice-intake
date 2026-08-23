@@ -1,7 +1,11 @@
-# Invoice intake
+# Kanjo 勘定
 
-Reads Japanese supplier invoices, checks what it read, and registers the result in
-the accounting system — sending anything it cannot verify to a human instead.
+**Invoice intake with a verification gate.** Reads Japanese supplier invoices,
+checks what it read against the accounting system's own rules, and files only
+what it can verify — sending anything else to a person.
+
+> 勘定 *(kanjō)* — "the account", "the reckoning". What you ask for when you want
+> the bill settled.
 
 Built for the AI Agent Engineer take-home. `SUBMISSION.md` is the document that
 explains the reasoning; this file is how to run it.

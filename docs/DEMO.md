@@ -1,4 +1,4 @@
-# Demo script (≤ 3 minutes)
+# Kanjo — demo script (≤ 3 minutes)
 
 Recorded against a clean run: `docker compose down -v && docker compose up --build`.
 The app opens empty — that is deliberate, and the demo starts by filling it.
