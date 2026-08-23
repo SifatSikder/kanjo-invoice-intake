@@ -1,8 +1,11 @@
-"""Command line entry points.
+"""Operational commands.
 
-    python -m app.cli ingest    process every invoice in the invoice folder
-    python -m app.cli status    show where everything ended up
+    python -m app.cli status    show where every invoice ended up
     python -m app.cli reset     clear our records and the accounting ledger
+
+Invoices enter the system by being uploaded, not from a folder on the server, so
+there is no ingest command here. These two exist for inspecting and clearing
+state without going through the web app.
 """
 
 from __future__ import annotations
@@ -11,17 +14,13 @@ import argparse
 import asyncio
 import logging
 import sys
-from pathlib import Path
-
-from sqlalchemy import delete, select, text
+from sqlalchemy import select, text
 from sqlalchemy.orm import selectinload
 
 from app.clients.accounting import AccountingClient
-from app.clients.openrouter import OpenRouterClient
 from app.config import settings
 from app.db import SessionLocal
-from app.models import Document, Extraction, Invoice, InvoiceStatus, Posting
-from app.pipeline.orchestrator import ingest_folder
+from app.models import Extraction, Invoice, InvoiceStatus
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)-7s %(name)s | %(message)s",
@@ -42,49 +41,16 @@ _LABEL = {
 }
 
 
-def _clients() -> tuple[OpenRouterClient, AccountingClient]:
-    return (
-        OpenRouterClient(
-            settings.openrouter_api_key,
-            base_url=settings.openrouter_base_url,
-            timeout=settings.extraction_timeout_seconds,
-        ),
-        AccountingClient(
-            settings.accounting_api_base,
-            settings.accounting_api_key,
-            timeout=settings.accounting_timeout_seconds,
-        ),
+def _accounting() -> AccountingClient:
+    return AccountingClient(
+        settings.accounting_api_base,
+        settings.accounting_api_key,
+        timeout=settings.accounting_timeout_seconds,
     )
 
 
-async def cmd_ingest(args) -> int:
-    openrouter, accounting = _clients()
-
-    health = await accounting.health()
-    if not health.ok:
-        logger.error(
-            "the accounting system at %s is not reachable. Start it with "
-            "`python3 accounting_api.py`.", settings.accounting_api_base,
-        )
-        return 2
-
-    folder = Path(args.folder or settings.invoice_dir)
-    logger.info("ingesting %s using %s", folder, settings.extraction_model)
-
-    async with SessionLocal() as session:
-        processed = await ingest_folder(
-            session, folder,
-            openrouter=openrouter, accounting=accounting,
-            auto_post=not args.no_post,
-        )
-        await session.commit()
-
-    logger.info("processed %s new document(s)", len(processed))
-    return await cmd_status(args)
-
-
 async def cmd_status(args) -> int:
-    _, accounting = _clients()
+    accounting = _accounting()
 
     async with SessionLocal() as session:
         invoices = (
@@ -128,7 +94,7 @@ async def cmd_status(args) -> int:
 
 
 async def cmd_reset(args) -> int:
-    _, accounting = _clients()
+    accounting = _accounting()
     async with SessionLocal() as session:
         for table in ("review_events", "postings", "check_results", "invoice_lines",
                       "invoices", "extractions", "documents"):
@@ -143,12 +109,6 @@ async def cmd_reset(args) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(prog="app.cli")
     sub = parser.add_subparsers(dest="command", required=True)
-
-    ingest = sub.add_parser("ingest", help="process every invoice in a folder")
-    ingest.add_argument("--folder", default=None)
-    ingest.add_argument("--no-post", action="store_true",
-                        help="run extraction and verification but register nothing")
-    ingest.set_defaults(func=cmd_ingest)
 
     status = sub.add_parser("status", help="show where every invoice ended up")
     status.set_defaults(func=cmd_status)

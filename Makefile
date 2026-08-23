@@ -4,9 +4,9 @@ COMPOSE := docker compose
 PY := backend/.venv/bin/python
 export DATABASE_URL ?= postgresql+asyncpg://invoice:invoice@localhost:5433/invoice
 
-.PHONY: up down logs ingest status reset test eval dev-api dev-web install
+.PHONY: up down logs status reset test eval dev-api dev-web install
 
-up:            ## start everything and process the sample invoices
+up:            ## start everything (opens on an empty upload screen)
 	$(COMPOSE) up --build
 
 down:          ## stop everything
@@ -17,9 +17,6 @@ clean:         ## stop everything and delete the database volume
 
 logs:
 	$(COMPOSE) logs -f api
-
-ingest:        ## process the invoice folder (idempotent)
-	$(COMPOSE) exec api python -m app.cli ingest
 
 status:        ## show where every invoice ended up
 	$(COMPOSE) exec api python -m app.cli status

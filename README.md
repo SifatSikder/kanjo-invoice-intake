@@ -42,9 +42,11 @@ That is the whole product: someone has an invoice in front of them and wants it
 dealt with. The client's staff handle them *"one by one, as they arrive from
 suppliers"*, so that is the shape the intake takes.
 
-To see every case at once, use the **process the 12 sample invoices** link under
-the drop zone (or `make ingest`), which runs the whole sample folder — the bulk
-path, for clearing a backlog.
+**To see every case at once**, select all twelve files in `invoices/` and drop
+them together — the picker takes a multiple selection, and the whole batch is
+read concurrently in under thirty seconds. There is no folder-on-the-server
+mode: uploading is the only way an invoice gets in, for one document or for a
+month of them.
 
 ### What you should see with all 12
 
@@ -82,7 +84,7 @@ before you click.
 ```bash
 make test      # 86 offline tests: no LLM, no database, ~0.2s
 make status    # where every invoice ended up
-make ingest    # bulk-process the sample folder (idempotent — keyed by content hash)
+make reset     # clear the queue and the accounting ledger
 make reset     # clear our records and empty the accounting ledger
 make eval      # score models against hand-built ground truth (costs a few cents)
 make down      # stop; `make clean` also drops the database volume
@@ -97,7 +99,6 @@ docker compose up -d db            # or point DATABASE_URL at your own Postgres
 cd backend && .venv/bin/python -m alembic upgrade head
 make dev-api                       # :8001
 make dev-web                       # :3000
-cd backend && .venv/bin/python -m app.cli ingest
 ```
 
 ---

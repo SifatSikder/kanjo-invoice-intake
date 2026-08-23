@@ -74,8 +74,8 @@ class Document(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     filename: Mapped[str] = mapped_column(String(512), nullable=False)
-    # Content hash makes re-ingesting the same folder a no-op, which the
-    # "retry as often as you like" requirement needs.
+    # Content hash makes re-uploading the same file a no-op, so a document that
+    # is sent twice is never read or registered twice.
     sha256: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
     mime_type: Mapped[str] = mapped_column(String(128), nullable=False)
     page_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)

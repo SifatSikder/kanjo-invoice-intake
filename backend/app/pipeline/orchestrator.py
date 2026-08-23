@@ -1,14 +1,14 @@
 """The pipeline state machine.
 
-    ingest -> render -> extract -> normalise -> resolve supplier -> dedupe
+    upload -> render -> extract -> normalise -> resolve supplier -> dedupe
            -> verify -> {auto-post | review queue | blocked}
 
 Two properties are worth calling out.
 
-Idempotent ingest: documents are keyed by SHA-256 of their bytes, so re-running
-the ingest over the same folder does nothing. The brief invites you to "retry as
-often as you like", and a pipeline that double-registers on a second run would
-be reproducing the client's original complaint.
+Idempotent intake: documents are keyed by SHA-256 of their bytes, so uploading
+the same file twice does nothing the second time. The client's complaint was
+about paying an invoice twice, and a pipeline that registers a re-sent document
+again would be reproducing it.
 
 Nothing is posted that has not passed every check, or been approved by a named
 human whose decision is recorded in review_events.
@@ -50,9 +50,22 @@ from app.schemas import NormalizedInvoice, NormalizedLine
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_SUFFIXES = {".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".webp"}
-
 _master_cache: PartnerMaster | None = None
+
+# Extraction runs concurrently -- it is slow, network-bound and independent per
+# document. Deciding an invoice's fate and registering it does NOT, because that
+# decision depends on every invoice already registered. Two copies of the same
+# invoice arriving in one upload could otherwise both read "not a duplicate"
+# before either had committed, and both would register: precisely the double
+# payment this project exists to prevent.
+#
+# The guarded section is a duplicate lookup, an in-memory check ladder and one
+# HTTP POST, so serialising it costs milliseconds against a ten-second
+# extraction. Across multiple API workers this lock would not hold; there the
+# answer is a partial unique index on (partner_code, invoice_number) in
+# Postgres, which is noted in the submission as a scaling step rather than
+# built here for a single-process deployment.
+_registration_lock = asyncio.Lock()
 
 
 async def get_partner_master(client: AccountingClient, *, refresh: bool = False) -> PartnerMaster:
@@ -341,7 +354,27 @@ async def process_accepted(
     _apply_normalized(invoice, normalized, match)
     await session.flush()
 
-    # --- verification --------------------------------------------------------
+    # --- verification and registration, serialised (see _registration_lock) ---
+    async with _registration_lock:
+        return await _decide_and_register(
+            session, invoice, normalized, match, rendered, result_config=config,
+            accounting=accounting, auto_post=auto_post,
+        )
+
+
+async def _decide_and_register(
+    session: AsyncSession,
+    invoice: Invoice,
+    normalized: NormalizedInvoice,
+    match,
+    rendered: RenderedDocument,
+    *,
+    result_config: Settings,
+    accounting: AccountingClient,
+    auto_post: bool,
+) -> Invoice:
+    """Run the checks and register. Callers must hold _registration_lock."""
+    config = result_config
     duplicates = await find_duplicates(
         session,
         partner_code=match.partner_code,
@@ -373,77 +406,13 @@ async def process_accepted(
             await session.flush()
             await post_invoice(session, accounting, invoice)
 
-    await session.flush()
+    # Committing here, still under the lock, is the point of the lock. Each
+    # upload is processed on its own session and therefore its own connection,
+    # so a flush would leave the row invisible to the next document's duplicate
+    # lookup. Releasing the lock only after the commit is what makes that lookup
+    # see everything already registered.
+    await session.commit()
     return invoice
-
-
-async def process_document(
-    session: AsyncSession,
-    path: Path,
-    *,
-    openrouter: OpenRouterClient,
-    accounting: AccountingClient,
-    master: PartnerMaster,
-    config: Settings | None = None,
-    auto_post: bool | None = None,
-) -> Invoice | None:
-    """Accept and process one file. Returns None when it was already ingested."""
-    accepted = await accept_document(session, path, config=config)
-    if accepted.already_ingested:
-        return None
-    return await process_accepted(
-        session, accepted,
-        openrouter=openrouter, accounting=accounting, master=master,
-        config=config, auto_post=auto_post,
-    )
-
-
-async def ingest_folder(
-    session: AsyncSession,
-    folder: Path,
-    *,
-    openrouter: OpenRouterClient,
-    accounting: AccountingClient,
-    config: Settings | None = None,
-    auto_post: bool | None = None,
-    concurrency: int | None = None,
-) -> list[Invoice]:
-    """Process every supported document in a folder.
-
-    Extraction runs concurrently (it is entirely I/O bound), but the database
-    writes and the duplicate check are serialised deliberately: two copies of the
-    same invoice arriving in one batch must not both pass the duplicate check by
-    racing each other. invoice_01 and invoice_07 are exactly that case.
-    """
-    config = config or default_settings
-    master = await get_partner_master(accounting)
-    paths = sorted(p for p in Path(folder).iterdir() if p.suffix.lower() in SUPPORTED_SUFFIXES)
-
-    limit = asyncio.Semaphore(concurrency or config.max_concurrent_extractions)
-    processed: list[Invoice] = []
-
-    async def guarded(path: Path) -> Invoice | None:
-        async with limit:
-            return await process_document(
-                session, path,
-                openrouter=openrouter, accounting=accounting, master=master,
-                config=config, auto_post=auto_post,
-            )
-
-    # Sequential at the session level: AsyncSession is not safe for concurrent use,
-    # and serial processing is what makes in-batch duplicate detection reliable.
-    for path in paths:
-        try:
-            invoice = await guarded(path)
-        except Exception:  # noqa: BLE001 - isolate the failure to this document
-            logger.exception("failed to process %s", path.name)
-            await session.rollback()
-            continue
-        if invoice is not None:
-            processed.append(invoice)
-        await session.commit()
-
-    return processed
 
 
 async def summarize(session: AsyncSession) -> dict:

@@ -54,11 +54,8 @@ services:
       EXTRACTION_MODEL: ${EXTRACTION_MODEL:-google/gemini-3.7-flash}
       AUTO_POST_ENABLED: ${AUTO_POST_ENABLED:-true}
       AMOUNT_REVIEW_THRESHOLD_JPY: ${AMOUNT_REVIEW_THRESHOLD_JPY:-1000000}
-      INVOICE_DIR: /data/invoices
       STORAGE_DIR: /data/storage
-      SEED_ON_STARTUP: ${SEED_ON_STARTUP:-false}
     volumes:
-      - ./invoices:/data/invoices:ro
       - storage:/data/storage
     ports:
       # 8001 on the host: 8000 is a common default and is often already taken.

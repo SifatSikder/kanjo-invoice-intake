@@ -21,10 +21,9 @@ class Settings(BaseSettings):
 
     # --- storage -------------------------------------------------------------
     database_url: str = "postgresql+asyncpg://invoice:invoice@localhost:5433/invoice"
-    # Documents are written here in the demo. In production this is swapped for a
+    # Uploaded documents are rendered here. In production this is swapped for a
     # GCS bucket behind the same interface (see app/pipeline/render.py).
     storage_dir: Path = REPO_ROOT / "storage"
-    invoice_dir: Path = REPO_ROOT / "invoices"
 
     # --- the accounting system we must integrate with ------------------------
     accounting_api_base: str = "http://localhost:8080"

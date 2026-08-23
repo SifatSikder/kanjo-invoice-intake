@@ -125,7 +125,6 @@ export function Dashboard({
   const [stats, setStats] = useState(initialStats);
   const [invoices, setInvoices] = useState(initialInvoices);
   const [notes, setNotes] = useState<UploadOutcome["rejected"]>([]);
-  const [seeding, setSeeding] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refresh = useCallback(async () => {
@@ -143,19 +142,15 @@ export function Dashboard({
   }, [invoices]);
 
   // Poll only while something is actually being read, then stop. No timer runs
-  // on an idle queue.
-  const working = invoices.some((i) => i.status === "PENDING") || seeding;
+  // on an idle queue, so there is nothing for a Refresh button to do.
+  const working = invoices.some((i) => i.status === "PENDING");
   useEffect(() => {
     if (!working) return;
-    timer.current = setTimeout(() => {
-      refresh().then((list) => {
-        if (seeding && list.length >= 12) setSeeding(false);
-      });
-    }, 1800);
+    timer.current = setTimeout(refresh, 1800);
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [working, invoices, seeding, refresh]);
+  }, [working, invoices, refresh]);
 
   const onUploaded = useCallback(
     (outcome: UploadOutcome) => {
@@ -164,13 +159,6 @@ export function Dashboard({
     },
     [refresh],
   );
-
-  async function loadSamples() {
-    setSeeding(true);
-    setNotes([]);
-    await fetch("/api/admin/ingest", { method: "POST" });
-    setTimeout(refresh, 1200);
-  }
 
   async function reset() {
     if (!confirm("Clear every processed invoice and empty the accounting ledger?")) return;
@@ -194,31 +182,19 @@ export function Dashboard({
             Anything that cannot be verified stops here for you.
           </p>
         </div>
-        <div className="actions">
-          <button className="btn" onClick={() => refresh()}>
-            Refresh
-          </button>
-          {!empty && (
+        {!empty && (
+          <div className="actions">
             <button className="btn danger" onClick={reset}>
               Clear all
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <div style={{ marginTop: 18 }}>
         <UploadZone onUploaded={onUploaded} compact={!empty} />
       </div>
 
-      {empty && (
-        <p className="note" style={{ textAlign: "center", marginTop: 12 }}>
-          No invoices yet. Drop one above — or{" "}
-          <button className="linkish" onClick={loadSamples} disabled={seeding}>
-            {seeding ? "processing the 12 samples…" : "process the 12 sample invoices"}
-          </button>{" "}
-          to see every case at once.
-        </p>
-      )}
 
       {notes.length > 0 && (
         <div style={{ marginTop: 12 }}>

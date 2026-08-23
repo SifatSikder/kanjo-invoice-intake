@@ -91,34 +91,22 @@ SHA-256 of their bytes, so re-uploading costs nothing and registers nothing.</p>
 <div class="expect"><h4>Expected</h4><p><em>".md is not supported. Upload a PDF, JPG, PNG, TIFF or WebP."</em>
 Rejected on the spot, with no half-created record left behind.</p></div>
 
-<h2>2 · Load the rest — the bulk path</h2>
-<p>Uploading one at a time is the daily flow. For a backlog — or to see all twelve cases at once — use the bulk path.</p>
-<p><span class="step">1</span>Click <strong>process the 12 sample invoices</strong> under the drop zone
-(visible when the list is empty), or run:</p>
-<pre>docker compose exec api python -m app.cli ingest</pre>
-<p>Takes ~2.5 minutes. Rows appear as each one finishes.</p>
-
-<div class="expect avoid"><h4>What you should end up with</h4>
-<table>
-<tr><th>Count</th><th>Group</th><th>Meaning</th></tr>
-<tr><td class="n">7</td><td><span class="pill p-ok">REGISTERED</span></td><td>Passed every check. No human involved.</td></tr>
-<tr><td class="n">3</td><td><span class="pill p-rev">NEEDS REVIEW</span></td><td>A check failed, or policy requires a person.</td></tr>
-<tr><td class="n">2</td><td><span class="pill p-blk">BLOCKED</span></td><td>Cannot be registered at all.</td></tr>
-</table>
-<p style="margin:0"><strong>10 of 12 will end up registered.</strong> Not 12 — and that is the correct answer.</p></div>
-
-<p>Notice the ordering: <strong>blocked first, registered last</strong>. The queue is sorted by what a human has to
-decide, not by arrival time.</p>
-
-<h3>Read the stat cards</h3>
+<h2>2 · Load the rest — the same door, more files</h2>
+<p>Uploading one at a time is the daily flow. A backlog is the same action with more
+files selected — there is no separate bulk mode, and no folder on the server.</p>
+<p><span class="step">1</span>Click the drop zone, select <strong>all twelve files</strong> in
+<code>invoices/</code>, and open them. Or drag the whole selection on at once.</p>
+<div class="expect avoid"><h4>Expected</h4>
 <ul>
-<li><strong>Auto-pass rate</strong> — the only metric that decides whether this pays for itself. The AI costs
-less than half a cent per invoice; <em>review minutes</em> are the real cost.</li>
-<li><strong>Extraction cost</strong> — measured live from OpenRouter's billing, not estimated.</li>
-<li><strong>In accounting</strong> — read back live from <code>GET /invoices</code> on the client's system.</li>
-</ul>
-<div class="box warn"><p><strong>Don't read 58% as a production number.</strong> Five of these twelve invoices are
-deliberately broken. A real month is mostly repeat suppliers with stable layouts.</p></div>
+<li>All twelve appear under <strong>Being read</strong> immediately.</li>
+<li>They are read four at a time, so the batch finishes in <strong>about 30 seconds</strong>,
+not twelve times ten.</li>
+<li>They settle into <strong>7 registered · 3 needing review · 2 blocked</strong>.</li>
+</ul></div>
+<div class="box"><p><strong>Worth watching:</strong> invoice_01 and invoice_07 are the same
+invoice, and in this batch they are read at the same time. Only one registers. Deciding an
+invoice's fate is serialised precisely so two copies cannot both read "not a duplicate"
+before either has committed — which would be the double payment the client complained about.</p></div>
 
 <h2>3 · Flow A — the duplicate <span class="pill p-blk">BLOCKED</span></h2>
 <p><em>This is the failure the CEO's email describes, planted in the sample data.</em></p>
@@ -241,9 +229,11 @@ looked like before). Any figure in the ledger traces back to the pixels it came 
 <h2>9 · Idempotency — run it twice</h2>
 <p>The brief invites you to retry as often as you like. A pipeline that double-registers on a second run would
 reproduce the client's original complaint.</p>
-<pre>docker compose exec api python -m app.cli ingest</pre>
-<div class="expect"><h4>Expected</h4><p><code>processed 0 new document(s)</code> — every file is skipped. Documents are
-keyed by SHA-256 of their bytes, so re-ingesting is a no-op. Nothing is registered twice.</p></div>
+<pre>docker compose exec api python -m app.cli status</pre>
+<div class="expect"><h4>Expected</h4><p><em>"this exact file has already been uploaded"</em>, with a
+link to the one already here. Documents are keyed by the SHA-256 of their bytes, so nothing is
+read or registered twice. Note this is the <em>file</em> check; invoice_07 shows the other one —
+a different scan of the same invoice, caught by supplier and invoice number.</p></div>
 
 <h2>10 · The test suite — verification without the AI</h2>
 <pre>cd backend &amp;&amp; .venv/bin/python -m pytest -q</pre>

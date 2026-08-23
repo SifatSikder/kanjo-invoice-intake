@@ -75,11 +75,10 @@ caught any of them.
 3. **Registration** into the accounting API, including handling every documented
    error code and the one problem the API's design leaves to the caller (no
    idempotency key).
-4. **Upload as the primary way in** — someone drops an invoice on the screen and
+4. **Upload as the only way in** — someone drops an invoice on the screen and
    watches it get read, checked and registered. The client's staff handle
    invoices "one by one, as they arrive from suppliers", so that is the shape the
-   intake takes. Bulk folder ingest still exists for clearing a backlog, but it is
-   the secondary path, not the product.
+   intake takes; a batch is the same action with more files selected.
 5. **The review screen** — document beside the data, with the accounting
    system's own arithmetic re-run live in the browser as the reviewer types.
 6. **A model eval harness** scoring candidates against the ground truth, so
@@ -129,12 +128,27 @@ because it informs a choice I can change with one config value.
 boot, which made the pipeline demonstrable but made the *intake invisible* — a
 queue that filled itself, with no answer to "how does an invoice get in?" beyond
 "put it in a folder and restart". That is not how the client works. Their staff
-handle invoices one at a time as they arrive, so uploading is the primary path
-and the folder is the bulk path. The upload request returns as soon as the file
+handle invoices one at a time as they arrive, so uploading is the only intake.
+Bulk is the same door: the picker takes a multiple selection, and a month of
+invoices is read concurrently. Keeping a second, folder-shaped entry point would
+have been demo scaffolding pretending to be a feature -- nobody outside the
+server can put a file in it. The upload request returns as soon as the file
 is stored, before anything is read: the uploader sees the invoice appear as
 *reading…* and the row updates itself through extraction, verification and
 registration. Blocking the response for the ten seconds an extraction takes would
 leave them staring at a spinner with no evidence the upload had even landed.
+
+**Concurrency: read in parallel, decide in series.** Extraction is slow, network
+bound and independent per document, so a batch of twelve is read four at a time
+and finishes in under thirty seconds. Deciding an invoice's fate is not
+independent -- it depends on everything already registered -- so the duplicate
+lookup, the check ladder and the POST run under a lock, and the transaction
+commits before the lock is released. Without that, two copies of the same
+invoice uploaded together could both read "not a duplicate" before either had
+committed, and both would register: the exact double payment the client
+described. At more than one API worker this lock stops being enough, and the
+answer becomes a partial unique index on `(partner_code, invoice_number)` in
+Postgres.
 
 **The rule everything else follows from: the model transcribes, our code
 computes.** The prompt forbids the model from doing arithmetic, converting a

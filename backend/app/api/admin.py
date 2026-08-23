@@ -2,28 +2,20 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
-from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, Depends
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import accounting_client, openrouter_client
+from app.api.deps import accounting_client
 from app.config import settings
-from app.db import SessionLocal, get_session
+from app.db import get_session
 from app.models import Document, Extraction, Invoice, InvoiceStatus, ReviewEvent
-from app.pipeline.orchestrator import ingest_folder
 from app.schemas import DashboardStats
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["admin"])
-
-# Guards against two ingests running at once, which would race the duplicate check.
-_ingest_lock = asyncio.Lock()
-_ingest_state = {"running": False, "last_error": None}
-
 
 @router.get("/stats", response_model=DashboardStats)
 async def stats(session: AsyncSession = Depends(get_session)) -> DashboardStats:
@@ -87,45 +79,6 @@ async def stats(session: AsyncSession = Depends(get_session)) -> DashboardStats:
 async def partners() -> dict:
     """The supplier master, for the review screen's picker."""
     return {"partners": await accounting_client().get_partners()}
-
-
-async def _run_ingest(folder: Path, auto_post: bool) -> None:
-    async with _ingest_lock:
-        try:
-            async with SessionLocal() as session:
-                await ingest_folder(
-                    session, folder,
-                    openrouter=openrouter_client(),
-                    accounting=accounting_client(),
-                    auto_post=auto_post,
-                )
-                await session.commit()
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("ingest failed")
-            _ingest_state["last_error"] = str(exc)
-        finally:
-            _ingest_state["running"] = False
-
-
-@router.post("/admin/ingest")
-async def trigger_ingest(background: BackgroundTasks, auto_post: bool = True) -> dict:
-    """Kick off a bulk run over the invoice folder.
-
-    The running flag is set here rather than inside the background task. Setting
-    it in the task leaves a window between this check and the task actually
-    starting, and two clicks landing in that window both start a run -- which
-    then race each other's duplicate checks.
-    """
-    if _ingest_state["running"]:
-        return {"started": False, "reason": "an ingest is already running"}
-    _ingest_state.update(running=True, last_error=None)
-    background.add_task(_run_ingest, Path(settings.invoice_dir), auto_post)
-    return {"started": True, "folder": str(settings.invoice_dir)}
-
-
-@router.get("/admin/ingest")
-async def ingest_status() -> dict:
-    return dict(_ingest_state)
 
 
 @router.post("/admin/reset")

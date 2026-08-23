@@ -27,7 +27,7 @@ Drag the same file in again:
 
 > "And it won't take it twice."
 
-**0:45 — Load the other eleven** (click *process the 12 sample invoices*)
+**0:45 — Load the other eleven** (select them all in the picker and drop them together)
 
 Point at the three groups, top to bottom:
 

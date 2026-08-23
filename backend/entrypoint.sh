@@ -16,15 +16,4 @@ echo "database is up"
 
 alembic upgrade head
 
-# Process the sample folder on first boot so the demo has something to show.
-# Ingest is idempotent (documents are keyed by content hash), so a restart
-# re-runs this harmlessly and finishes instantly.
-if [ "${SEED_ON_STARTUP:-false}" = "true" ]; then
-  (
-    echo "seeding from ${INVOICE_DIR:-/data/invoices} in the background..."
-    python -m app.cli ingest 2>&1 | sed 's/^/[seed] /' \
-      || echo "[seed] failed; use the Ingest button in the UI to retry"
-  ) &
-fi
-
 exec uvicorn app.main:app --host 0.0.0.0 --port 8000

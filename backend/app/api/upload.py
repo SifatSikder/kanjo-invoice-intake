@@ -1,9 +1,10 @@
-"""Upload — the way an invoice actually enters the system.
+"""Upload — the only way an invoice enters the system.
 
 The client's staff handle invoices "one by one, as they arrive from suppliers".
 That is the shape of the product: someone has a document in front of them and
-wants it dealt with. So uploading is the primary path, and the folder ingest in
-admin.py is the secondary one for clearing a backlog.
+wants it dealt with. A backlog is the same action with more files selected, so
+there is no separate bulk mode and no folder on the server -- an entry point
+nobody outside the machine can reach would be demo scaffolding, not a feature.
 
 The request returns as soon as the file is safely stored and recorded, before
 anything has been read. The uploader immediately sees the invoice in the queue
@@ -51,6 +52,11 @@ ALLOWED = {".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".webp"}
 # alive here can be garbage collected mid-extraction and silently disappear.
 _running: set[asyncio.Task] = set()
 
+# Someone selecting a month of invoices at once would otherwise fire that many
+# simultaneous model calls and collect rate-limit errors. Uploads are accepted
+# immediately either way; this only paces the reading behind them.
+_extraction_slots = asyncio.Semaphore(settings.max_concurrent_extractions)
+
 
 async def _process_in_background(invoice_id: int, rendered: RenderedDocument) -> None:
     """Read, verify and register one uploaded document.
@@ -60,7 +66,7 @@ async def _process_in_background(invoice_id: int, rendered: RenderedDocument) ->
     rather than produced again.
     """
     try:
-        async with SessionLocal() as session:
+        async with _extraction_slots, SessionLocal() as session:
             invoice = await load_invoice(session, invoice_id)
             if invoice is None:
                 return
