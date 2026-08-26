@@ -206,3 +206,47 @@ def test_clean_invoices_have_no_errors_at_all(ground_truth, pipeline_results):
         assert not result.errors and not result.blockers, (
             f"{name} should be clean but failed: {[c.name for c in result.failed]}"
         )
+
+
+def test_one_pen_mark_produces_one_finding(pipeline_results):
+    """invoice_08 has pen on its bank details. That is one problem, not two.
+
+    The severe check states it in full; a second, weaker "something was
+    handwritten" beside it is the same news told worse.
+    """
+    result, _, _ = pipeline_results["invoice_08.jpg"]
+    handwriting = [c for c in result.failed if c.name.startswith("handwriting")]
+    assert [c.name for c in handwriting] == ["handwriting.on_payment_details"]
+
+
+def test_a_harmless_mark_is_still_mentioned(pipeline_results):
+    """invoice_04's 受領 stamp changes nothing, but the reviewer should know."""
+    result, _, _ = pipeline_results["invoice_04.jpg"]
+    handwriting = [c for c in result.failed if c.name.startswith("handwriting")]
+    assert [c.name for c in handwriting] == ["handwriting.detected"]
+
+
+def test_the_note_is_never_wrapped_in_its_own_description(ground_truth, master):
+    """Re-checking must not re-prefix the note.
+
+    verify_invoice used to recover the note from the check's message rather than
+    its detail, so each pass wrapped the previous sentence in another copy of
+    "Handwritten annotation present:". Policy changes re-check the whole queue,
+    so it compounded quickly.
+    """
+    from app.pipeline.verify import run_checks
+
+    invoice = build("invoice_08.jpg", ground_truth["invoice_08.jpg"])
+    invoice.has_handwriting = True
+    invoice.handwriting_affects_payment = False
+    invoice.handwriting_notes = "受領 1/20 経理"
+    match = master.resolve(invoice.supplier_name, invoice.supplier_registration_no)
+
+    for _ in range(3):
+        result = run_checks(invoice, match, amount_review_threshold=0)
+        detected = next(c for c in result.checks if c.name == "handwriting.detected")
+        # Whatever a later pass reads back must be the note itself.
+        invoice.handwriting_notes = (detected.detail or {}).get("notes", "")
+
+    assert invoice.handwriting_notes == "受領 1/20 経理"
+    assert detected.message.count("Handwritten annotation present") == 1

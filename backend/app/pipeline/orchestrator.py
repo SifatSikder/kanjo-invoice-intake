@@ -167,8 +167,16 @@ async def verify_invoice(
     affects_payment = any(
         c.name == "handwriting.on_payment_details" and not c.passed for c in invoice.checks
     )
+    # Read the raw note out of the check's detail, never its message. The message
+    # is already "Handwritten annotation present: ...", so feeding that back in
+    # makes the next run prefix it again -- and re-checks now happen every time a
+    # policy dial moves, so it compounds.
     handwriting_notes = next(
-        (c.message for c in invoice.checks if c.name == "handwriting.detected" and not c.passed),
+        (
+            (c.detail or {}).get("notes", "")
+            for c in invoice.checks
+            if c.name == "handwriting.detected" and not c.passed
+        ),
         "",
     )
 

@@ -403,11 +403,14 @@ def run_checks(
     # transfer details is a textbook invoice-fraud vector and must always reach
     # one -- even though bank details are not part of the accounting payload,
     # so nothing downstream would ever catch it.
+    # When the pen has touched payment details the check below says so in full,
+    # and this one would repeat it as a second, weaker finding about the same
+    # mark. Only raise it when it is the only thing worth mentioning.
     add(
         Check(
             "handwriting.detected",
             Severity.WARN,
-            not invoice.has_handwriting,
+            not invoice.has_handwriting or invoice.handwriting_affects_payment,
             f"Handwritten annotation present: {invoice.handwriting_notes}"
             if invoice.has_handwriting
             else "No handwritten annotations detected",
