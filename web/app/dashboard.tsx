@@ -179,7 +179,9 @@ export function Dashboard({
     <>
       <div className="pagehead">
         <div className="pagehead-top">
-          <h1>Invoice intake</h1>
+          {/* Names the thing, not the activity -- the review page's heading is
+              the invoice number, and this is the list you work through. */}
+          <h1>Invoice Inbox</h1>
           {!empty && (
             <button className="btn danger" onClick={reset}>
               Clear all

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Kanjo — invoice intake",
+  title: "Kanjo — Invoice Inbox",
   description:
     "Reads supplier invoices, checks them against your accounting system's own rules, " +
     "and files only what it can verify.",
