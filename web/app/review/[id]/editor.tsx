@@ -157,10 +157,42 @@ export function ReviewEditor({
       <div>
         {banner && <div className={`banner ${banner.kind}`}>{banner.text}</div>}
 
+        {/* Every field below is disabled once an invoice is filed. Disabling
+            controls without saying why reads as a broken screen, and the reason
+            is a real constraint rather than caution: the accounting system
+            offers POST and nothing else, so a registration cannot be amended. */}
+        {isPosted && (
+          <div className="panel filed-note">
+            <h2 style={{ marginTop: 0 }}>Filed — no longer editable</h2>
+            <p>
+              This invoice is registered in the accounting system
+              {invoice.accounting_id && (
+                <>
+                  {" as "}
+                  <strong className="mono">{invoice.accounting_id}</strong>
+                </>
+              )}
+              . The accounting system has no way to amend a registration, so changing
+              these values here would only make our record disagree with theirs.
+            </p>
+            <p className="note" style={{ marginTop: 8 }}>
+              To correct something that has already been filed, raise the correction in
+              the accounting system — an adjusting entry or a credit note — the same way
+              you would for an invoice keyed in by hand.
+            </p>
+          </div>
+        )}
+
         {failed.length > 0 && (
           <div className="panel">
             <h2 style={{ marginTop: 0 }}>
-              {blockers.length > 0 ? "This invoice can't be registered" : "Before you approve"}
+              {/* "Before you approve" is the wrong tense once it is filed --
+                  there is nothing left to decide, and the flags are history. */}
+              {blockers.length > 0
+                ? "This invoice can't be registered"
+                : isPosted
+                  ? "Noted when this was filed"
+                  : "Before you approve"}
             </h2>
             {failed.map((c, n) => (
               <Problem key={c.name} c={c} index={n} />
