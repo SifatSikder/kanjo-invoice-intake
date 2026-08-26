@@ -39,6 +39,7 @@ export interface Invoice {
   subtotal: number | null;
   tax_amount: number | null;
   total_amount: number | null;
+  bank_details: string | null;
   min_confidence: number;
   has_handwriting: boolean;
   notes: string | null;

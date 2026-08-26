@@ -145,6 +145,9 @@ class Invoice(Base, TimestampMixin):
     issue_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     currency: Mapped[str] = mapped_column(String(8), default="JPY")
+    # Shown to a reviewer, never transmitted: the accounting system has no field
+    # for payment details, so nothing here can act on them.
+    bank_details: Mapped[str | None] = mapped_column(String(512), nullable=True)
     subtotal: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     tax_amount: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     total_amount: Mapped[int | None] = mapped_column(BigInteger, nullable=True)

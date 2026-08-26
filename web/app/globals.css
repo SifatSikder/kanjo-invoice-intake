@@ -533,3 +533,14 @@ input:disabled, select:disabled {
   display: flex; gap: 9px; align-items: center;
   padding-top: 16px; margin-top: 4px; border-top: 1px solid var(--line);
 }
+
+/* Payment details: read only, and loud when a pen has been near them. */
+.bank-line {
+  font-size: 13.5px; padding: 10px 12px; margin: 0 0 4px;
+  background: rgba(16, 24, 40, 0.03);
+  border: 1px solid var(--line); border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.payment-flagged { border-color: rgba(225, 29, 72, 0.3); }
+.payment-flagged h2 { color: var(--err); }
+.payment-flagged .bank-line { background: var(--err-wash); border-color: rgba(225, 29, 72, 0.22); }

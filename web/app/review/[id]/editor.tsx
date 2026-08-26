@@ -56,6 +56,9 @@ export function ReviewEditor({
     .sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]);
   const blockers = failed.filter((c) => c.severity === "BLOCKER");
   const isPosted = invoice.status === "POSTED";
+  const paymentAltered = invoice.checks.some(
+    (c) => c.name === "handwriting.on_payment_details" && !c.passed,
+  );
 
   // What the accounting system will actually store. It recalculates from the
   // lines, so these are the only totals it can accept.
@@ -267,6 +270,30 @@ export function ReviewEditor({
             </div>
           </div>
         </div>
+
+        {/* Shown because a reviewer told the payee account has been altered needs
+            to see what it says, and squinting at the scan is not a workflow. Read
+            only, and labelled as such: the accounting system has no field for
+            payment details, so nothing here reaches it. Payment happens
+            elsewhere, which is exactly why the check has to fire here. */}
+        {invoice.bank_details && (
+          <div className={`panel ${paymentAltered ? "payment-flagged" : ""}`}>
+            <h2 style={{ marginTop: 0 }}>Payment details</h2>
+            <p className="bank-line mono">{invoice.bank_details}</p>
+            {paymentAltered ? (
+              <p className="note">
+                This is what the invoice has <strong>printed</strong>. Someone has altered
+                it by hand — compare it against the document on the left, and confirm the
+                account with the supplier by phone before anyone pays it.
+              </p>
+            ) : (
+              <p className="note">
+                As printed on the invoice. Kanjo does not send payment details anywhere and
+                cannot pay anything; this is here so you can check it against the document.
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="panel">
           <h2 style={{ marginTop: 0 }}>Line items</h2>

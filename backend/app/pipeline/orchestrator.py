@@ -126,6 +126,7 @@ def _apply_normalized(invoice: Invoice, normalized: NormalizedInvoice, match) ->
     invoice.issue_date_raw = normalized.issue_date_raw
     invoice.due_date_raw = normalized.due_date_raw
     invoice.currency = normalized.currency
+    invoice.bank_details = normalized.bank_details
     invoice.subtotal = normalized.subtotal
     invoice.tax_amount = normalized.tax_amount
     invoice.total_amount = normalized.total_amount

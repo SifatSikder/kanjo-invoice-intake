@@ -73,6 +73,10 @@ class RawExtraction(BaseModel):
     tax_amount_raw: str = ""
     total_amount_raw: str = ""
     currency: str = "JPY"
+    # The お振込先 line, exactly as printed. Never sent to the accounting system --
+    # it has no field for it -- but a reviewer told that pen has altered the payee
+    # account needs to see what it says without leaving the screen.
+    bank_details_raw: str = ""
     lines: list[RawLine] = Field(default_factory=list)
     tax_breakdown: list[RawTaxBreakdown] = Field(default_factory=list)
     handwritten_annotations: list[RawHandwriting] = Field(default_factory=list)
@@ -105,6 +109,7 @@ class NormalizedInvoice(BaseModel):
     issue_date_raw: str = ""
     due_date_raw: str = ""
     currency: str = "JPY"
+    bank_details: str = ""
     subtotal: int | None = None
     tax_amount: int | None = None
     total_amount: int | None = None
@@ -190,6 +195,7 @@ class InvoiceOut(BaseModel):
     subtotal: int | None
     tax_amount: int | None
     total_amount: int | None
+    bank_details: str | None
     min_confidence: float
     has_handwriting: bool
     notes: str | None

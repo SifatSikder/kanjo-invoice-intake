@@ -40,7 +40,7 @@ EXTRACTION_SCHEMA: dict = {
     "required": [
         "supplier_name", "supplier_registration_no", "invoice_number",
         "issue_date_raw", "due_date_raw", "subtotal_raw", "tax_amount_raw",
-        "total_amount_raw", "currency", "lines", "tax_breakdown",
+        "total_amount_raw", "currency", "bank_details_raw", "lines", "tax_breakdown",
         "handwritten_annotations", "field_confidence", "notes",
     ],
     "properties": {
@@ -53,6 +53,7 @@ EXTRACTION_SCHEMA: dict = {
         "tax_amount_raw": _STR,
         "total_amount_raw": _STR,
         "currency": _STR,
+        "bank_details_raw": _STR,
         "lines": {
             "type": "array",
             "items": {
@@ -146,6 +147,12 @@ subtotal_raw = 小計, tax_amount_raw = the consumption tax total (消費税), a
 total_amount_raw = 合計 or 御請求金額. When several 消費税 rows are printed (for
 example 8% and 10% separately), list each in tax_breakdown with its rate, its
 base (the 対象 amount) and its tax, AND report their sum in tax_amount_raw.
+
+BANK TRANSFER DETAILS
+Copy the お振込先 line exactly as printed -- bank, branch, account type and
+number -- into bank_details_raw. Copy only what is PRINTED there. If a pen has
+altered it, the alteration belongs in handwritten_annotations, not here, so that
+the original and the change can be told apart.
 
 HANDWRITING
 Report anything handwritten, stamped or added in coloured pen, separately from
@@ -316,6 +323,7 @@ def normalize_extraction(raw: RawExtraction) -> NormalizedInvoice:
         issue_date_raw=normalize_text(raw.issue_date_raw),
         due_date_raw=normalize_text(raw.due_date_raw),
         currency=normalize_text(raw.currency) or "JPY",
+        bank_details=normalize_text(raw.bank_details_raw),
         subtotal=parse_amount(raw.subtotal_raw),
         tax_amount=parse_amount(raw.tax_amount_raw),
         total_amount=parse_amount(raw.total_amount_raw),
