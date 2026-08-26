@@ -108,7 +108,7 @@ export function PolicyPanel({
           <div>
             <h2 style={{ margin: 0 }}>Review policy</h2>
             <p className="sub" style={{ fontSize: 13 }}>
-              Where automation stops and you start.
+              What gets filed for you, and what comes to you first.
             </p>
           </div>
           <button className="btn" onClick={onClose} aria-label="Close">
@@ -117,9 +117,9 @@ export function PolicyPanel({
         </div>
 
         <p className="note" style={{ marginTop: 0 }}>
-          None of these came from your brief — they were our assumptions. Changing one
-          re-checks every invoice that is not already filed. Nothing is filed as a
-          result; an invoice that becomes eligible still waits for you.
+          These decide which invoices are filed for you and which come to you first.
+          Changing one re-checks everything still open. Nothing is filed as a result —
+          an invoice that becomes eligible still waits for you to send it.
         </p>
 
         {!policy ? (
@@ -140,8 +140,8 @@ export function PolicyPanel({
                 <option value="no">No — send everything to me</option>
               </select>
               <p className="dial-why">
-                Off means nothing reaches the accounting system without a person, which
-                is where a cautious first month would start.
+                Turn this off and nothing reaches the accounting system until you send it
+                yourself.
               </p>
             </div>
 
@@ -164,34 +164,39 @@ export function PolicyPanel({
                 />
               </div>
               <p className="dial-why">
-                A control, not a correctness check — a large invoice gets a person however
-                cleanly it was read. <strong>0</strong> turns it off.
+                Anything above this comes to you first, however cleanly it was read. Set
+                it to <strong>0</strong> to turn this off.
               </p>
             </div>
 
             <div className="dial">
-              <label htmlFor="p-conf">Review below confidence</label>
-              <input
-                id="p-conf"
-                type="number"
-                min={0}
-                max={1}
-                step={0.05}
-                value={draft?.confidence_floor ?? 0}
-                disabled={saving}
-                onChange={(e) =>
-                  setDraft((d) => d && { ...d, confidence_floor: Number(e.target.value) })
-                }
-              />
+              <label htmlFor="p-conf">Send to me when the reading looks unsure</label>
+              <div className="dial-input">
+                {/* Shown as a percentage. A reviewer thinks in "how sure is it",
+                    not in a 0-to-1 float. */}
+                <input
+                  id="p-conf"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={Math.round((draft?.confidence_floor ?? 0) * 100)}
+                  disabled={saving}
+                  onChange={(e) =>
+                    setDraft((d) => d && { ...d, confidence_floor: Number(e.target.value) / 100 })
+                  }
+                />
+                <span className="suffix">% sure or less</span>
+              </div>
               <p className="dial-why">
-                Weak in practice: the model reports near-certainty on almost everything,
-                including an invoice whose own total does not add up. The arithmetic
-                checks do the real work.
+                The reader scores how clearly it could make out each field. Anything at or
+                below this comes to you instead of being filed. Be aware it rarely admits
+                doubt, so this is a backstop — the arithmetic checks catch far more.
               </p>
             </div>
 
             <div className="dial">
-              <label htmlFor="p-window">Near-duplicate window</label>
+              <label htmlFor="p-window">Watch for the same bill arriving twice within</label>
               <div className="dial-input">
                 <input
                   id="p-window"
@@ -209,8 +214,9 @@ export function PolicyPanel({
                 <span className="suffix">days</span>
               </div>
               <p className="dial-why">
-                Same supplier, same total, this close together gets flagged even when the
-                invoice numbers differ — how a re-issued invoice actually looks.
+                If a supplier sends another bill for exactly the same amount within this
+                many days, you get told — even when the invoice number is different, which
+                is what a re-sent or re-issued bill looks like.
               </p>
             </div>
 
@@ -230,10 +236,6 @@ export function PolicyPanel({
             </div>
 
             {result && <div className="banner ok">{result}</div>}
-            <p className="note">
-              Last changed by <strong>{policy.updated_by}</strong>. Every change is
-              recorded, so a filing can be read against the rules in force at the time.
-            </p>
           </>
         )}
       </aside>
