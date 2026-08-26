@@ -5,10 +5,18 @@ import type { Invoice, Partner, Stats, Summary } from "./types";
 const SERVER_BASE = process.env.API_BASE || "http://localhost:8001";
 const isServer = typeof window === "undefined";
 
+/** Carries the status so a caller can tell "this is gone" from "this is broken". */
+export class ApiError extends Error {
+  constructor(readonly status: number, path: string) {
+    super(`${path} -> ${status}`);
+    this.name = "ApiError";
+  }
+}
+
 async function get<T>(path: string): Promise<T> {
   const url = isServer ? `${SERVER_BASE}${path}` : path;
   const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`${path} -> ${res.status}`);
+  if (!res.ok) throw new ApiError(res.status, path);
   return res.json();
 }
 

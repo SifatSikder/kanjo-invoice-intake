@@ -45,8 +45,34 @@ const LABEL: Record<string, string> = {
   EXTRACT_FAILED: "unreadable",
 };
 
-function Row({ i }: { i: Summary }) {
+
+/** Outline bin. Drawn rather than pulled from an icon set, so the stroke weight
+ *  matches the rest of the interface and nothing else has to be installed. */
+function TrashIcon() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M3 6h18" />
+      <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6" />
+      <path d="M18.5 6l-.8 13.1a2 2 0 0 1-2 1.9H8.3a2 2 0 0 1-2-1.9L5.5 6" />
+      <path d="M10 11v6M14 11v6" />
+    </svg>
+  );
+}
+
+function Row({ i, onDeleted }: { i: Summary; onDeleted: () => void }) {
   const router = useRouter();
+  const [deleting, setDeleting] = useState(false);
   const pending = i.status === "PENDING";
   const href = `/review/${i.id}`;
 
@@ -104,13 +130,42 @@ function Row({ i }: { i: Summary }) {
       <td className="num">{yen(i.total_amount)}</td>
       <td className="mono">{i.accounting_id ?? "—"}</td>
       <td style={{ color: "var(--muted)", maxWidth: 300 }}>{i.blocking_reason ?? ""}</td>
+      <td className="rowtools">
+        <button
+          className="iconbtn"
+          title={`Remove ${i.filename} from the queue`}
+          aria-label={`Remove ${i.filename} from the queue`}
+          disabled={deleting}
+          onClick={async (e) => {
+            e.stopPropagation();
+            // Registered invoices stay registered; say so rather than implying
+            // this undoes the filing.
+            const warning = i.accounting_id
+              ? `Remove ${i.filename} from this queue?\n\nIt stays registered in the accounting system as ${i.accounting_id} — this only removes it from here.`
+              : `Remove ${i.filename} from this queue?`;
+            if (!confirm(warning)) return;
+            setDeleting(true);
+            try {
+              const res = await fetch(`/api/invoices/${i.id}`, { method: "DELETE" });
+              if (!res.ok) throw new Error(String(res.status));
+              onDeleted();
+            } catch {
+              setDeleting(false);
+            }
+          }}
+        >
+          {deleting ? <span className="spin" /> : <TrashIcon />}
+        </button>
+      </td>
     </tr>
   );
 }
 
 function Section({
-  title, blurb, rows, index,
-}: { title: string; blurb: string; rows: Summary[]; index: number }) {
+  title, blurb, rows, index, onDeleted,
+}: {
+  title: string; blurb: string; rows: Summary[]; index: number; onDeleted: () => void;
+}) {
   if (!rows.length) return null;
   return (
     <section className="rise" style={{ ["--i" as string]: index }}>
@@ -135,7 +190,7 @@ function Section({
         </thead>
         <tbody>
           {rows.map((i) => (
-            <Row key={i.id} i={i} />
+            <Row key={i.id} i={i} onDeleted={onDeleted} />
           ))}
         </tbody>
       </table>
@@ -189,13 +244,6 @@ export function Dashboard({
     [refresh],
   );
 
-  async function reset() {
-    if (!confirm("Clear every processed invoice and empty the accounting ledger?")) return;
-    await fetch("/api/admin/reset", { method: "POST" });
-    setNotes([]);
-    refresh();
-  }
-
   const empty = invoices.length === 0;
   const pct = stats ? Math.round(stats.auto_pass_rate * 100) : 0;
   const registered = stats ? stats.auto_posted + stats.posted_after_review : 0;
@@ -207,11 +255,6 @@ export function Dashboard({
           {/* Names the thing, not the activity -- the review page's heading is
               the invoice number, and this is the list you work through. */}
           <h1>Invoice Inbox</h1>
-          {!empty && (
-            <button className="btn danger" onClick={reset}>
-              Clear all
-            </button>
-          )}
         </div>
         <p className="sub">
           Upload a supplier invoice. It is read, checked against the accounting
@@ -295,15 +338,22 @@ export function Dashboard({
         </>
       )}
 
-      {GROUPS.map((g, n) => (
-        <Section
-          key={g.key}
-          index={n + 6}
-          title={g.title}
-          blurb={g.blurb}
-          rows={invoices.filter((i) => i.status === g.key)}
-        />
-      ))}
+      {/* Stagger by position among the sections that actually render, not by
+          position in GROUPS. Otherwise "Filed" -- usually the longest list and
+          the one people look at -- waits out the delay of every empty group
+          above it before it appears. */}
+      {GROUPS.map((g) => ({ ...g, rows: invoices.filter((i) => i.status === g.key) }))
+        .filter((g) => g.rows.length > 0)
+        .map((g, n) => (
+          <Section
+            key={g.key}
+            index={n + 6}
+            title={g.title}
+            blurb={g.blurb}
+            rows={g.rows}
+            onDeleted={refresh}
+          />
+        ))}
     </>
   );
 }

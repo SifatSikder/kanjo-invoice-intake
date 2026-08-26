@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import shutil
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -15,6 +17,7 @@ from app.models import Invoice, InvoiceStatus
 from app.pipeline.orchestrator import load_invoice
 from app.schemas import CheckOut, InvoiceOut, InvoiceSummary, LineOut
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/invoices", tags=["invoices"])
 
 # The order the review queue should be worked in: things that can never post
@@ -130,3 +133,49 @@ async def get_page_image(
     if not path.exists():
         raise HTTPException(404, "page image not found")
     return FileResponse(path, media_type="image/jpeg")
+
+
+@router.delete("/{invoice_id}")
+async def delete_invoice(
+    invoice_id: int, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """Remove one invoice and the document it came from.
+
+    Deleting a *registered* invoice removes our record, not the registration --
+    the accounting system is the system of record and we cannot un-file
+    something there. That is deliberately not hidden from the person doing it.
+
+    It fails safe: re-uploading the same document afterwards is no longer caught
+    by our own duplicate check, but the accounting system still refuses it with
+    DUPLICATE_INVOICE, because (partner_code, invoice_number) is still taken
+    there.
+    """
+    invoice = await load_invoice(session, invoice_id)
+    if invoice is None:
+        raise HTTPException(404, "invoice not found")
+
+    document = invoice.document
+    accounting_id = next((p.accounting_id for p in invoice.postings if p.succeeded), None)
+    storage_path = document.storage_path if document else None
+
+    # The Document cascades to its invoice, lines, checks, postings and review
+    # events, so one delete takes the whole record.
+    await session.delete(document if document else invoice)
+    await session.commit()
+
+    # Rendered pages are reproducible from nothing once the source is gone.
+    if storage_path:
+        shutil.rmtree(Path(storage_path), ignore_errors=True)
+
+    logger.info("deleted invoice %s (%s)", invoice_id, accounting_id or "not registered")
+    return {
+        "deleted": invoice_id,
+        "was_registered": accounting_id is not None,
+        "accounting_id": accounting_id,
+        "note": (
+            "Removed from this queue. It remains registered in the accounting "
+            "system as " + accounting_id + "."
+        )
+        if accounting_id
+        else "Removed.",
+    }

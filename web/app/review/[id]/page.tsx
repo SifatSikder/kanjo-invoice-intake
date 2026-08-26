@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getInvoice, getPartners, yen } from "@/lib/api";
+import { notFound } from "next/navigation";
+import { ApiError, getInvoice, getPartners, yen } from "@/lib/api";
 import { ReviewEditor } from "./editor";
 
 export const dynamic = "force-dynamic";
@@ -10,10 +11,16 @@ export default async function ReviewPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [invoice, partners] = await Promise.all([
-    getInvoice(Number(id)),
-    getPartners(),
-  ]);
+
+  // An invoice can legitimately stop existing -- a stale bookmark, a link shared
+  // after someone cleared the queue. That is a not-found page, not a stack trace.
+  let invoice, partners;
+  try {
+    [invoice, partners] = await Promise.all([getInvoice(Number(id)), getPartners()]);
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) notFound();
+    throw e;
+  }
 
   return (
     <main className="wrap">
