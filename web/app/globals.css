@@ -228,6 +228,14 @@ thead th {
 }
 tbody tr { transition: background 0.2s var(--glide); }
 tbody tr:hover { background: rgba(79, 70, 229, 0.035); }
+
+/* The row is a click target, so it should say so under the cursor. The filename
+   link inside still carries the keyboard affordance. */
+tbody tr.row-open { cursor: pointer; }
+tbody tr.row-open:hover { background: rgba(79, 70, 229, 0.06); }
+tbody tr.row-open:active { background: rgba(79, 70, 229, 0.10); }
+/* Keyboard focus lands on the link, so light the whole row from there. */
+tbody tr.row-open:focus-within { background: rgba(79, 70, 229, 0.07); }
 tbody tr:last-child td { border-bottom: none; }
 td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .raw { font-size: 11.5px; color: var(--muted); margin-top: 3px; font-family: var(--mono); }

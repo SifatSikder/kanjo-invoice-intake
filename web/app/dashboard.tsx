@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { yen } from "@/lib/api";
 import type { Stats, Summary } from "@/lib/types";
@@ -45,9 +46,33 @@ const LABEL: Record<string, string> = {
 };
 
 function Row({ i }: { i: Summary }) {
+  const router = useRouter();
   const pending = i.status === "PENDING";
+  const href = `/review/${i.id}`;
+
+  /* The whole row opens the invoice, but the filename stays a real link: that
+     is what gives keyboard users a tab stop, screen readers something to
+     announce, and everyone else cmd-click and "open in new tab". A row handler
+     alone would take all three away. */
+  function open(e: React.MouseEvent<HTMLTableRowElement>) {
+    if (pending) return;
+    // The link and any control inside handle their own clicks.
+    if ((e.target as HTMLElement).closest("a, button, input, select")) return;
+    // Do not navigate out from under someone selecting a figure to copy.
+    if (window.getSelection()?.toString()) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) {
+      window.open(href, "_blank", "noopener");
+      return;
+    }
+    router.push(href);
+  }
+
   return (
-    <tr className={pending ? "pending" : undefined}>
+    <tr
+      className={pending ? "pending" : "row-open"}
+      onClick={open}
+      onAuxClick={(e) => e.button === 1 && open(e)}
+    >
       <td>
         {pending ? (
           <span className="mono">{i.filename}</span>
