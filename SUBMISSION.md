@@ -1,7 +1,7 @@
 # Submission
 
 - Name: Sifat Sikder
-- Submission date (YYYY-MM-DD): 2026-08-24
+- Submission date (YYYY-MM-DD): 2026-08-26
 - Hours actually spent: **5**
 - Repository / how to run it: **Kanjo** (勘定) — <https://github.com/SifatSikder/kanjo-invoice-intake>. `cp .env.example .env` (add an OpenRouter key), then `docker compose up --build`. Open <http://localhost:3000> and drop an invoice on it. `docs/TESTING_GUIDE.pdf` walks every case.
 - Demo video: **[Watch on Google Drive](https://drive.google.com/file/d/1rI-9x5RQu2wWAwxh0JWY6-dal-bco6wj/view?usp=sharing)** — 7 min 33 s, over your three because I walk through every verification outcome rather than one. The beats that matter: **2:30** the duplicate, **2:45** the unknown supplier, **4:30** the altered bank details.
