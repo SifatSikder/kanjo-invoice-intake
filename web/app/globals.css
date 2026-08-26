@@ -222,6 +222,11 @@ h2 {
   overflow: hidden;
 }
 table { width: 100%; border-collapse: collapse; }
+/* Fixed layout so the colgroup is honoured rather than treated as a hint --
+   otherwise a long supplier name in one section still shifts that table's
+   columns out of line with the others. */
+table.queue { table-layout: fixed; }
+table.queue td { overflow-wrap: anywhere; }
 th, td {
   text-align: left; padding: 12px 14px; font-size: 13.5px; vertical-align: top;
   border-bottom: 1px solid var(--line);

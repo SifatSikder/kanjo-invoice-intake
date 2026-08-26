@@ -148,7 +148,19 @@ function Section({
         {blurb}
       </p>
       <div className="t-wrap">
-      <table>
+      <table className="queue">
+        {/* One shared grid. Without it each table sizes its own columns to its
+            own rows, so "Total" sits at a different place in every section and
+            the eye cannot run down the figures. */}
+        <colgroup>
+          <col style={{ width: "13%" }} />
+          <col style={{ width: "10%" }} />
+          <col style={{ width: "17%" }} />
+          <col style={{ width: "13%" }} />
+          <col style={{ width: "11%" }} />
+          <col style={{ width: "10%" }} />
+          <col />
+        </colgroup>
         <thead>
           <tr>
             <th>Document</th>
