@@ -51,7 +51,7 @@ caught any of them.
 
 | What you wanted to ask | The assumption you made | Why |
 |---|---|---|
-| Above what amount must a human approve, regardless of confidence? | ¥1,000,000, configurable (`AMOUNT_REVIEW_THRESHOLD_JPY`) | Every finance function I have seen has such a limit; the number is a policy decision, not an engineering one. I made it a config value so it costs one line to change, and surfaced it in the UI so a reviewer knows *why* an invoice stopped. It puts invoice_02 into review despite a flawless read. |
+| Above what amount must a human approve, regardless of confidence? | ¥1,000,000 — but editable in the app, not by me | Every finance function has such a limit and the number is theirs to set, so rather than bury my guess in a config file I put it behind a **Review policy** panel with the confidence floor and the duplicate window. Changing one re-checks every invoice not already filed, and each change is recorded with who made it. My ¥1,000,000 is only a starting value; it is what puts invoice_02 into review despite a flawless read, and one edit releases it. |
 | A supplier not in the master arrived (invoice_10). Do we add it, or reject the invoice? | Block it and queue it. Never auto-create a partner. | Creating a payee record is how invoice fraud succeeds. The master is the client's control boundary, and a machine should not be able to widen it. Someone with authority must add 新星ロジスティクス deliberately. |
 | Invoice_08 has the bank account changed in red pen. Is that authorised? | Treat any handwriting on payment details as blocking-for-review; treat other handwriting as harmless. | A changed payee account is the classic invoice-fraud vector. Note that bank details are not part of the accounting API payload at all — so if this pipeline did not flag it, *nothing downstream would*. |
 | Invoice_09's printed total is ¥1 above its own line items. Pay as printed, or as recalculated? | Register the recalculated figure, but only after a human confirms. | The accounting system recalculates from the lines and would reject the printed total outright, so "as printed" is not even available. But silently changing a supplier's total is not a machine's decision. |
@@ -134,6 +134,17 @@ because it informs a choice I can change with one config value.
                         │                           │                            │
                  POST /invoices              review queue              never registered
 ```
+
+**The assumptions are the client's to change.** Three numbers in the check ladder
+were invented by me, because the brief states none of them: the approval limit,
+the confidence floor, and the near-duplicate window. Leaving them in environment
+variables would have made them mine. They live in the database behind a **Review
+policy** panel instead, and changing one re-judges every invoice that is not
+already filed -- so the queue shows the rule in force rather than the rule that
+happened to apply the day a document arrived. Nothing is registered as a side
+effect of a policy change: raising a limit can make an invoice eligible, but a
+person still presses approve. Every change is recorded with its author, because
+a filing is only explicable alongside the rules that applied to it.
 
 **Intake: upload, not a folder.** An earlier version of this seeded a folder at
 boot, which made the pipeline demonstrable but made the *intake invisible* — a

@@ -253,3 +253,51 @@ class ReviewEvent(Base, TimestampMixin):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     invoice: Mapped[Invoice] = relationship(back_populates="review_events")
+
+
+class Policy(Base, TimestampMixin):
+    """The dials that decide where automation stops and a person starts.
+
+    These began as assumptions -- the brief never states an approval limit, a
+    confidence floor or a duplicate window, and the client was not available to
+    ask. Holding them in the database rather than in environment variables makes
+    them the client's decision to change rather than ours, which is what they
+    always were.
+
+    A single row, id 1.
+    """
+
+    __tablename__ = "policy"
+
+    id: Mapped[int] = mapped_column(primary_key=True, default=1)
+    # Register clean invoices without asking. Off sends everything to a person.
+    auto_post_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Above this total a person looks, however clean the reading. 0 disables it.
+    amount_review_threshold_jpy: Mapped[int] = mapped_column(BigInteger, default=1_000_000)
+    # Below this reported confidence on any field, a person looks.
+    confidence_floor: Mapped[float] = mapped_column(Float, default=0.80)
+    # Same supplier, same total, this many days apart counts as a near-duplicate.
+    near_duplicate_window_days: Mapped[int] = mapped_column(Integer, default=7)
+
+    updated_by: Mapped[str] = mapped_column(String(128), default="system")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class PolicyChange(Base, TimestampMixin):
+    """Who moved a dial, when, and what it was before.
+
+    A registration is only explicable if the rules in force at the time are
+    known. Without this, "why did a 2,000,000 JPY invoice file itself?" has no
+    answer beyond looking at today's settings, which may not be the ones that
+    applied.
+    """
+
+    __tablename__ = "policy_changes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    actor: Mapped[str] = mapped_column(String(128), nullable=False, default="reviewer")
+    before: Mapped[dict] = mapped_column(JSONVariant, nullable=False)
+    after: Mapped[dict] = mapped_column(JSONVariant, nullable=False)
+    reverified: Mapped[int] = mapped_column(Integer, default=0)

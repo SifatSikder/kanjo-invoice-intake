@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { yen } from "@/lib/api";
 import type { Stats, Summary } from "@/lib/types";
+import { PolicyPanel } from "./policy";
 import { UploadZone, type UploadOutcome } from "./upload";
 
 const GROUPS = [
@@ -12,6 +13,13 @@ const GROUPS = [
     key: "PENDING",
     title: "Being read",
     blurb: "Extraction takes a few seconds per page. These update themselves.",
+  },
+  {
+    // Reachable when auto-filing is off, or when a policy change clears an
+    // invoice that was previously held. Without a home here it would vanish.
+    key: "EXTRACTED",
+    title: "Ready to file",
+    blurb: "These passed every check but were not filed automatically. Open one to send it.",
   },
   {
     key: "BLOCKED",
@@ -36,7 +44,7 @@ const GROUPS = [
 
 const LABEL: Record<string, string> = {
   PENDING: "reading…",
-  EXTRACTED: "ready",
+  EXTRACTED: "ready to file",
   NEEDS_REVIEW: "needs review",
   BLOCKED: "blocked",
   POSTED: "registered",
@@ -224,6 +232,7 @@ export function Dashboard({
      per-invoice delete, only DELETE /invoices, which empties the whole ledger.
      A row-level bin would have implied a precision that does not exist. */
   const [clearing, setClearing] = useState(false);
+  const [policyOpen, setPolicyOpen] = useState(false);
   async function removeEverything() {
     if (
       !confirm(
@@ -261,16 +270,26 @@ export function Dashboard({
 
   return (
     <>
+      <PolicyPanel
+        open={policyOpen}
+        onClose={() => setPolicyOpen(false)}
+        onChanged={refresh}
+      />
       <div className="pagehead">
         <div className="pagehead-top">
           {/* Names the thing, not the activity -- the review page's heading is
               the invoice number, and this is the list you work through. */}
           <h1>Invoice Inbox</h1>
+          <div className="actions">
+            <button className="btn" onClick={() => setPolicyOpen(true)}>
+              Review policy
+            </button>
           {!empty && (
             <button className="btn danger" onClick={removeEverything} disabled={clearing}>
               {clearing ? "Removing…" : "Remove all"}
             </button>
           )}
+          </div>
         </div>
         <p className="sub">
           Upload a supplier invoice. It is read, checked against the accounting

@@ -490,3 +490,46 @@ input:disabled, select:disabled {
   }
   .rise, .check, .banner { opacity: 1 !important; transform: none !important; }
 }
+
+/* ------------------------------------------------------------- drawer ----- */
+.scrim {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(15, 23, 41, 0.28);
+  backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+  animation: fade 0.25s var(--glide);
+}
+@keyframes fade { from { opacity: 0 } to { opacity: 1 } }
+
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 61;
+  width: min(420px, 92vw); overflow-y: auto;
+  padding: 22px 24px 40px;
+  background: var(--glass-strong);
+  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  border-left: 1px solid var(--glass-edge);
+  box-shadow: -24px 0 60px -30px rgba(16, 24, 40, 0.4);
+  animation: slide-in 0.34s var(--glide);
+}
+@keyframes slide-in { from { transform: translateX(24px); opacity: 0 } to { transform: none; opacity: 1 } }
+.drawer-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; margin-bottom: 12px;
+}
+
+.dial {
+  padding: 14px 0; border-top: 1px solid var(--line);
+}
+.dial label {
+  display: block; font-size: 13px; font-weight: 600; margin-bottom: 7px;
+}
+.dial-input { display: flex; align-items: center; gap: 8px; }
+.dial-input .prefix, .dial-input .suffix { color: var(--muted); font-size: 13px; }
+.dial-why {
+  font-size: 12px; color: var(--muted); line-height: 1.5; margin: 7px 0 0;
+}
+.dial-why strong { color: var(--ink-2); }
+
+.apply-bar {
+  display: flex; gap: 9px; align-items: center;
+  padding-top: 16px; margin-top: 4px; border-top: 1px solid var(--line);
+}

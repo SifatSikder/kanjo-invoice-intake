@@ -43,6 +43,7 @@ from app.models import (
 from app.pipeline.dedupe import find_duplicates
 from app.pipeline.extract import PROMPT_VERSION, extract_document, normalize_extraction
 from app.pipeline.partners import PartnerMaster, PartnerMatch
+from app.pipeline.policy import read_policy
 from app.pipeline.post import post_invoice
 from app.pipeline.render import RenderedDocument, prepare_document
 from app.pipeline.verify import VerificationResult, run_checks
@@ -210,6 +211,7 @@ async def verify_invoice(
                 detail={"source": "chosen by a reviewer"},
             )
 
+    policy = await read_policy(session)
     duplicates = await find_duplicates(
         session,
         partner_code=match.partner_code,
@@ -217,15 +219,15 @@ async def verify_invoice(
         total_amount=invoice.total_amount,
         issue_date=invoice.issue_date,
         exclude_invoice_id=invoice.id,
-        window_days=config.near_duplicate_window_days,
+        window_days=policy.near_duplicate_window_days,
     )
 
     result = run_checks(
         normalized, match,
         duplicates=duplicates,
         text_layer=text_layer,
-        confidence_floor=config.confidence_floor,
-        amount_review_threshold=config.amount_review_threshold_jpy,
+        confidence_floor=policy.confidence_floor,
+        amount_review_threshold=policy.amount_review_threshold_jpy,
     )
     invoice.partner_code = match.partner_code
     invoice.partner_match_method = match.method
@@ -307,7 +309,7 @@ async def process_accepted(
 ) -> Invoice:
     """Read, verify and register a document that has already been accepted."""
     config = config or default_settings
-    auto_post = config.auto_post_enabled if auto_post is None else auto_post
+    auto_post = (await read_policy(session)).auto_post_enabled if auto_post is None else auto_post
     invoice = accepted.invoice
     rendered = accepted.rendered
     document_id = invoice.document_id
@@ -375,6 +377,7 @@ async def _decide_and_register(
 ) -> Invoice:
     """Run the checks and register. Callers must hold _registration_lock."""
     config = result_config
+    policy = await read_policy(session)
     duplicates = await find_duplicates(
         session,
         partner_code=match.partner_code,
@@ -382,14 +385,14 @@ async def _decide_and_register(
         total_amount=normalized.total_amount,
         issue_date=normalized.issue_date,
         exclude_invoice_id=invoice.id,
-        window_days=config.near_duplicate_window_days,
+        window_days=policy.near_duplicate_window_days,
     )
     result = run_checks(
         normalized, match,
         duplicates=duplicates,
         text_layer=rendered.text_layer if rendered.has_text_layer else None,
-        confidence_floor=config.confidence_floor,
-        amount_review_threshold=config.amount_review_threshold_jpy,
+        confidence_floor=policy.confidence_floor,
+        amount_review_threshold=policy.amount_review_threshold_jpy,
     )
     _persist_verification(invoice, result)
 
