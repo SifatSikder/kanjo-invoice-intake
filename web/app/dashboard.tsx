@@ -282,6 +282,10 @@ export function Dashboard({
   const empty = invoices.length === 0;
   const pct = stats ? Math.round(stats.auto_pass_rate * 100) : 0;
   const registered = stats ? stats.auto_posted + stats.posted_after_review : 0;
+  // Positive: the ledger holds registrations this queue no longer tracks.
+  // Negative: we believe we filed something the ledger does not have, which is
+  // the direction that actually warrants attention.
+  const drift = stats ? stats.registered_in_accounting - registered : 0;
 
   return (
     <>
@@ -356,11 +360,29 @@ export function Dashboard({
                   : "—"}
               </div>
             </div>
+            {/* This is a reconciliation figure, not a copy of our own count. It
+                is read from the accounting system itself, so when the two
+                disagree the card has to say which way and why -- a bare number
+                next to "0 filed" reads as a contradiction. */}
             <div className="card rise" style={{ ["--i" as string]: 5 }}>
-              <div className="n">{stats.registered_in_accounting}</div>
+              <div className={`n${drift < 0 ? " alarm" : ""}`}>
+                {stats.registered_in_accounting}
+              </div>
               <div className="l">In the accounting system</div>
               <div className="hint">
-                Read back live from <span className="mono">GET /invoices</span>.
+                {drift === 0 ? (
+                  <>Matches the {registered} filed from this queue.</>
+                ) : drift > 0 ? (
+                  <>
+                    {drift} more than this queue has filed — registered earlier, or removed
+                    from here afterwards. Deleting here never un-files them there.
+                  </>
+                ) : (
+                  <strong>
+                    {-drift} filed from this queue {-drift === 1 ? "is" : "are"} missing
+                    there. Worth investigating.
+                  </strong>
+                )}
               </div>
             </div>
           </div>

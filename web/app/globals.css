@@ -201,6 +201,11 @@ h2 {
   background: linear-gradient(135deg, var(--ink) 20%, var(--brand-ink));
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
+.card .n.alarm {
+  background: linear-gradient(135deg, var(--err) 20%, #9f1239);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.card .hint strong { color: var(--err); font-weight: 620; }
 .card .l {
   font-size: 10.5px; font-weight: 660; letter-spacing: 0.08em; text-transform: uppercase;
   color: var(--ink-2); margin-top: 5px;
