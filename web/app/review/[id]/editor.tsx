@@ -59,6 +59,12 @@ export function ReviewEditor({
   const paymentAltered = invoice.checks.some(
     (c) => c.name === "handwriting.on_payment_details" && !c.passed,
   );
+  // The phone call has to land somewhere. Until it does, this invoice cannot be
+  // filed -- otherwise stopping it bought nothing.
+  const [outcome, setOutcome] = useState<string>("");
+  const [accountToPay, setAccountToPay] = useState("");
+  const [howConfirmed, setHowConfirmed] = useState("");
+  const paymentAnswered = !paymentAltered || outcome !== "";
 
   // What the accounting system will actually store. It recalculates from the
   // lines, so these are the only totals it can accept.
@@ -75,6 +81,9 @@ export function ReviewEditor({
       invoice_number: invoiceNumber || null,
       issue_date: issueDate || null,
       due_date: dueDate || null,
+      payment_decision: paymentAltered && outcome
+        ? { outcome, account_to_pay: accountToPay, how_confirmed: howConfirmed }
+        : undefined,
       lines: lines.map((l, i) => ({
         seq: i + 1,
         description: l.description,
@@ -281,11 +290,82 @@ export function ReviewEditor({
             <h2 style={{ marginTop: 0 }}>Payment details</h2>
             <p className="bank-line mono">{invoice.bank_details}</p>
             {paymentAltered ? (
-              <p className="note">
-                This is what the invoice has <strong>printed</strong>. Someone has altered
-                it by hand — compare it against the document on the left, and confirm the
-                account with the supplier by phone before anyone pays it.
-              </p>
+              <>
+                <p className="note">
+                  This is what the invoice has <strong>printed</strong>. Someone has altered
+                  it by hand — compare it against the document on the left, and confirm the
+                  account with the supplier by phone before anyone pays it.
+                </p>
+
+                {invoice.payment_decision ? (
+                  <div className="settled">
+                    <strong>Settled.</strong>{" "}
+                    {invoice.payment_decision.outcome === "pay_altered"
+                      ? "The supplier confirmed the account changed."
+                      : invoice.payment_decision.outcome === "pay_printed"
+                        ? "The supplier confirmed the printed account is correct."
+                        : "The supplier could not be reached."}
+                    {invoice.payment_decision.account_to_pay && (
+                      <>
+                        {" "}Pay <strong className="mono">{invoice.payment_decision.account_to_pay}</strong>.
+                      </>
+                    )}
+                    {invoice.payment_decision.how_confirmed && (
+                      <div className="raw" style={{ marginTop: 6 }}>
+                        {invoice.payment_decision.how_confirmed} — recorded by{" "}
+                        {invoice.payment_decision.recorded_by}
+                      </div>
+                    )}
+                  </div>
+                ) : !isPosted ? (
+                  <div className="verify">
+                    <div className="field">
+                      <label htmlFor="pay-outcome">What did the supplier say?</label>
+                      <select
+                        id="pay-outcome"
+                        value={outcome}
+                        onChange={(e) => setOutcome(e.target.value)}
+                      >
+                        <option value="">— not checked yet —</option>
+                        <option value="pay_altered">
+                          Their account really did change
+                        </option>
+                        <option value="pay_printed">
+                          The printed account is correct; ignore the pen
+                        </option>
+                        <option value="supplier_unreachable">
+                          Could not reach them
+                        </option>
+                      </select>
+                    </div>
+                    {outcome === "pay_altered" && (
+                      <div className="field">
+                        <label htmlFor="pay-account">Account to pay</label>
+                        <input
+                          id="pay-account"
+                          value={accountToPay}
+                          placeholder="the account they confirmed"
+                          onChange={(e) => setAccountToPay(e.target.value)}
+                        />
+                      </div>
+                    )}
+                    <div className="field">
+                      <label htmlFor="pay-how">How you checked</label>
+                      <input
+                        id="pay-how"
+                        value={howConfirmed}
+                        placeholder="who you spoke to, and on what number"
+                        onChange={(e) => setHowConfirmed(e.target.value)}
+                      />
+                    </div>
+                    <p className="note" style={{ marginTop: 4 }}>
+                      Kanjo cannot pay anything and cannot send an account to the
+                      accounting system — it has no field for one. This is recorded
+                      against the invoice so whoever does pay it knows what you found.
+                    </p>
+                  </div>
+                ) : null}
+              </>
             ) : (
               <p className="note">
                 As printed on the invoice. Kanjo does not send payment details anywhere and
@@ -438,7 +518,12 @@ export function ReviewEditor({
               {blockers.length === 0 && (
                 <button
                   className="btn primary"
-                  disabled={busy}
+                  disabled={busy || !paymentAnswered}
+                  title={
+                    paymentAnswered
+                      ? undefined
+                      : "Record what the supplier said about the payment details first"
+                  }
                   onClick={() => send(`/api/invoices/${invoice.id}/approve`, "Approved")}
                 >
                   Approve &amp; register

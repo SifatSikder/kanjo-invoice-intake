@@ -40,6 +40,13 @@ export interface Invoice {
   tax_amount: number | null;
   total_amount: number | null;
   bank_details: string | null;
+  payment_decision: {
+    outcome: "pay_printed" | "pay_altered" | "supplier_unreachable";
+    account_to_pay?: string;
+    how_confirmed?: string;
+    printed_account?: string;
+    recorded_by?: string;
+  } | null;
   min_confidence: number;
   has_handwriting: boolean;
   notes: string | null;

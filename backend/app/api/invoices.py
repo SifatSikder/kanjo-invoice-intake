@@ -79,6 +79,7 @@ def to_detail(invoice: Invoice) -> InvoiceOut:
         tax_amount=invoice.tax_amount,
         total_amount=invoice.total_amount,
         bank_details=invoice.bank_details,
+        payment_decision=invoice.payment_decision,
         min_confidence=invoice.min_confidence,
         has_handwriting=invoice.has_handwriting,
         notes=invoice.notes,

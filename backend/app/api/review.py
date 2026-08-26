@@ -151,6 +151,32 @@ async def approve_invoice(
             },
         )
 
+    # Stopping an invoice for an altered payee is only worth doing if the
+    # resulting phone call is written down. Approving without saying what it
+    # established would spend a reviewer's time and keep none of the answer.
+    payment_altered = any(
+        c.name == "handwriting.on_payment_details" for c in result.errors
+    )
+    decision = patch.payment_decision if patch else None
+    if payment_altered and decision is None:
+        raise HTTPException(
+            422,
+            {
+                "message": "Say what you established about the payment details",
+                "detail": (
+                    "Someone altered the payee account by hand. Record what the "
+                    "supplier confirmed before this is filed, so whoever pays it "
+                    "knows which account to use."
+                ),
+            },
+        )
+    if decision is not None:
+        invoice.payment_decision = {
+            **decision.model_dump(),
+            "printed_account": invoice.bank_details or "",
+            "recorded_by": actor,
+        }
+
     overridden = [{"name": c.name, "message": c.message} for c in result.errors]
 
     posting = await post_invoice(session, accounting_client(), invoice)
@@ -168,6 +194,7 @@ async def approve_invoice(
         # What the human accepted responsibility for, recorded explicitly.
         note="; ".join(filter(None, [
             note,
+            _describe_payment(invoice.payment_decision) if decision else None,
             f"overrode {len(overridden)} check(s): "
             + ", ".join(c["name"] for c in overridden) if overridden else None,
         ])) or None,
@@ -259,3 +286,22 @@ async def retry_invoice(
 
     invoice = await load_invoice(session, invoice_id, fresh=True)
     return to_detail(invoice)
+
+
+_PAYMENT_OUTCOMES = {
+    "pay_printed": "supplier confirmed the printed account is correct; the pen was wrong",
+    "pay_altered": "supplier confirmed the account changed",
+    "supplier_unreachable": "supplier could not be reached",
+}
+
+
+def _describe_payment(decision: dict | None) -> str | None:
+    """One readable sentence for the audit trail."""
+    if not decision:
+        return None
+    parts = [f"payment details: {_PAYMENT_OUTCOMES.get(decision['outcome'], decision['outcome'])}"]
+    if decision.get("account_to_pay"):
+        parts.append(f"pay {decision['account_to_pay']}")
+    if decision.get("how_confirmed"):
+        parts.append(decision["how_confirmed"])
+    return "; ".join(parts)

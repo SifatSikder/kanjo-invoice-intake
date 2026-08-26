@@ -148,6 +148,11 @@ class Invoice(Base, TimestampMixin):
     # Shown to a reviewer, never transmitted: the accounting system has no field
     # for payment details, so nothing here can act on them.
     bank_details: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # What a reviewer established about altered payment details, and which
+    # account they concluded should actually be paid. Kanjo cannot pay anything
+    # and cannot send an account anywhere, so the only useful thing it can do
+    # with that phone call is record it against the invoice for whoever does.
+    payment_decision: Mapped[dict | None] = mapped_column(JSONVariant, nullable=True)
     subtotal: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     tax_amount: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     total_amount: Mapped[int | None] = mapped_column(BigInteger, nullable=True)

@@ -196,6 +196,7 @@ class InvoiceOut(BaseModel):
     tax_amount: int | None
     total_amount: int | None
     bank_details: str | None
+    payment_decision: dict | None
     min_confidence: float
     has_handwriting: bool
     notes: str | None
@@ -229,6 +230,19 @@ class LinePatch(BaseModel):
     tax_code: str = "T10"
 
 
+class PaymentDecision(BaseModel):
+    """What the reviewer established about altered payment details.
+
+    Required before an invoice flagged for a payee change can be approved: the
+    point of stopping it is the phone call, and an approval that does not say
+    what the call established has not really used the check.
+    """
+
+    outcome: Literal["pay_printed", "pay_altered", "supplier_unreachable"]
+    account_to_pay: str = ""
+    how_confirmed: str = ""
+
+
 class InvoicePatch(BaseModel):
     """What a reviewer may change. Deliberately narrow."""
 
@@ -242,6 +256,7 @@ class InvoicePatch(BaseModel):
     lines: list[LinePatch] | None = None
     note: str | None = None
     actor: str = "reviewer"
+    payment_decision: PaymentDecision | None = None
 
 
 class DashboardStats(BaseModel):

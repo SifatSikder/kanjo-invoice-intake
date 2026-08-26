@@ -544,3 +544,15 @@ input:disabled, select:disabled {
 .payment-flagged { border-color: rgba(225, 29, 72, 0.3); }
 .payment-flagged h2 { color: var(--err); }
 .payment-flagged .bank-line { background: var(--err-wash); border-color: rgba(225, 29, 72, 0.22); }
+
+.verify {
+  margin-top: 12px; padding-top: 12px;
+  border-top: 1px dashed rgba(225, 29, 72, 0.28);
+}
+.verify .field { grid-template-columns: 150px 1fr; }
+.settled {
+  margin-top: 12px; padding: 11px 13px; border-radius: 9px;
+  background: var(--ok-wash); border: 1px solid rgba(16, 185, 129, 0.25);
+  color: var(--ok); font-size: 13px; line-height: 1.5;
+}
+.settled .raw { color: var(--ok); opacity: 0.8; }
