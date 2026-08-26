@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import shutil
+from pathlib import Path
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select, text
@@ -83,13 +85,36 @@ async def partners() -> dict:
 
 @router.post("/admin/reset")
 async def reset(session: AsyncSession = Depends(get_session)) -> dict:
-    """Clear our records and the accounting ledger, for a clean demo run."""
+    """Empty this queue and the accounting system's ledger.
+
+    All or nothing by necessity: the accounting system exposes DELETE /invoices
+    and nothing finer, so a single registration cannot be withdrawn. That is not
+    a gap in the mock -- reversing a filed invoice is a credit note raised by
+    someone with authority, not something an intake tool should be able to do
+    quietly. This exists so a demo or a test run can start from clean.
+    """
     for table in ("review_events", "postings", "check_results", "invoice_lines",
                   "invoices", "extractions", "documents"):
         await session.execute(text(f"TRUNCATE TABLE {table} RESTART IDENTITY CASCADE"))
     await session.commit()
+
     result = await accounting_client().delete_all_invoices()
-    return {"cleared": True, "accounting_removed": (result.data or {}).get("removed", 0)}
+
+    # The rendered pages outlive the rows that pointed at them otherwise, and a
+    # long-running demo quietly fills the volume with orphans.
+    removed_files = 0
+    storage = Path(settings.storage_dir)
+    if storage.exists():
+        for child in storage.iterdir():
+            if child.is_dir():
+                shutil.rmtree(child, ignore_errors=True)
+                removed_files += 1
+
+    return {
+        "cleared": True,
+        "accounting_removed": (result.data or {}).get("removed", 0),
+        "documents_purged": removed_files,
+    }
 
 
 @router.get("/config")

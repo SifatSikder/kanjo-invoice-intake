@@ -46,38 +46,8 @@ const LABEL: Record<string, string> = {
 };
 
 
-/** Outline bin. Drawn rather than pulled from an icon set, so the stroke weight
- *  matches the rest of the interface and nothing else has to be installed. */
-function TrashIcon() {
-  return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.9"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path d="M3 6h18" />
-      <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6" />
-      <path d="M18.5 6l-.8 13.1a2 2 0 0 1-2 1.9H8.3a2 2 0 0 1-2-1.9L5.5 6" />
-      <path d="M10 11v6M14 11v6" />
-    </svg>
-  );
-}
-
-function Row({
-  i, onDeleted,
-}: {
-  i: Summary;
-  onDeleted: (failure?: { filename: string; reason: string }) => void;
-}) {
+function Row({ i }: { i: Summary }) {
   const router = useRouter();
-  const [deleting, setDeleting] = useState(false);
   const pending = i.status === "PENDING";
   const href = `/review/${i.id}`;
 
@@ -135,62 +105,13 @@ function Row({
       <td className="num">{yen(i.total_amount)}</td>
       <td className="mono">{i.accounting_id ?? "—"}</td>
       <td style={{ color: "var(--muted)", maxWidth: 300 }}>{i.blocking_reason ?? ""}</td>
-      <td className="rowtools">
-        <button
-          className="iconbtn"
-          title={`Remove ${i.filename} from the queue`}
-          aria-label={`Remove ${i.filename} from the queue`}
-          disabled={deleting}
-          onClick={async (e) => {
-            e.stopPropagation();
-            // Registered invoices stay registered; say so rather than implying
-            // this undoes the filing.
-            const warning = i.accounting_id
-              ? `Remove ${i.filename} from this queue?\n\nIt stays registered in the accounting system as ${i.accounting_id} — this only removes it from here.`
-              : `Remove ${i.filename} from this queue?`;
-            if (!confirm(warning)) return;
-            setDeleting(true);
-            try {
-              const res = await fetch(`/api/invoices/${i.id}`, { method: "DELETE" });
-              // 404 means it is already gone, which is what was asked for.
-              // Refreshing clears the stale row rather than leaving it sitting
-              // there looking undeletable.
-              if (res.ok || res.status === 404) {
-                onDeleted();
-              } else {
-                onDeleted({
-                  filename: i.filename,
-                  reason: `could not be removed (the server said ${res.status})`,
-                });
-              }
-            } catch (e) {
-              onDeleted({
-                filename: i.filename,
-                reason: `could not be removed: ${e instanceof Error ? e.message : e}`,
-              });
-            } finally {
-              // Unconditional: normally the row unmounts and this is moot, but
-              // if it survives the refresh the button must not stay spinning.
-              setDeleting(false);
-            }
-          }}
-        >
-          {deleting ? <span className="spin" /> : <TrashIcon />}
-        </button>
-      </td>
     </tr>
   );
 }
 
 function Section({
-  title, blurb, rows, index, onDeleted,
-}: {
-  title: string;
-  blurb: string;
-  rows: Summary[];
-  index: number;
-  onDeleted: (failure?: { filename: string; reason: string }) => void;
-}) {
+  title, blurb, rows, index,
+}: { title: string; blurb: string; rows: Summary[]; index: number }) {
   if (!rows.length) return null;
   return (
     <section className="rise" style={{ ["--i" as string]: index }}>
@@ -215,7 +136,7 @@ function Section({
         </thead>
         <tbody>
           {rows.map((i) => (
-            <Row key={i.id} i={i} onDeleted={onDeleted} />
+            <Row key={i.id} i={i} />
           ))}
         </tbody>
       </table>
@@ -261,15 +182,28 @@ export function Dashboard({
     };
   }, [working, invoices, refresh]);
 
-  /* A delete that fails must say so. Silently resetting the spinner leaves the
-     row sitting there looking broken, with nothing to act on. */
-  const onRemoved = useCallback(
-    (failure?: { filename: string; reason: string }) => {
-      setNotes(failure ? [{ filename: failure.filename, reason: failure.reason }] : []);
-      refresh();
-    },
-    [refresh],
-  );
+  /* All or nothing, because that is all the accounting system offers: it has no
+     per-invoice delete, only DELETE /invoices, which empties the whole ledger.
+     A row-level bin would have implied a precision that does not exist. */
+  const [clearing, setClearing] = useState(false);
+  async function removeEverything() {
+    if (
+      !confirm(
+        `Remove all ${invoices.length} invoice(s) from this queue AND empty the ` +
+          `accounting system's ledger?\n\nThe accounting system has no way to remove ` +
+          `one registration, so this is all or nothing. It cannot be undone.`,
+      )
+    )
+      return;
+    setClearing(true);
+    setNotes([]);
+    try {
+      await fetch("/api/admin/reset", { method: "POST" });
+      await refresh();
+    } finally {
+      setClearing(false);
+    }
+  }
 
   const onUploaded = useCallback(
     (outcome: UploadOutcome) => {
@@ -294,6 +228,11 @@ export function Dashboard({
           {/* Names the thing, not the activity -- the review page's heading is
               the invoice number, and this is the list you work through. */}
           <h1>Invoice Inbox</h1>
+          {!empty && (
+            <button className="btn danger" onClick={removeEverything} disabled={clearing}>
+              {clearing ? "Removing…" : "Remove all"}
+            </button>
+          )}
         </div>
         <p className="sub">
           Upload a supplier invoice. It is read, checked against the accounting
@@ -408,8 +347,7 @@ export function Dashboard({
             title={g.title}
             blurb={g.blurb}
             rows={g.rows}
-            onDeleted={onRemoved}
-          />
+            />
         ))}
     </>
   );
