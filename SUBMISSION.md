@@ -3,7 +3,7 @@
 - Name: Sifat Sikder
 - Submission date (YYYY-MM-DD): 2026-08-24
 - Hours actually spent: **5**
-- Repository / how to run it: **Kanjo** (勘定). `cp .env.example .env` (add an
+- Repository / how to run it: **Kanjo** (勘定) — <https://github.com/SifatSikder/kanjo-invoice-intake>. `cp .env.example .env` (add an
   OpenRouter key), then `docker compose up --build`. Open <http://localhost:3000>
   and drop an invoice on it. Full instructions in `README.md`; a step-by-step
   walkthrough of every case in `docs/TESTING_GUIDE.pdf`.
