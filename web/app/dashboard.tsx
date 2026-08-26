@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { yen } from "@/lib/api";
 import type { Stats, Summary } from "@/lib/types";
+import { Confirm } from "./confirm";
 import { PolicyPanel } from "./policy";
 import { UploadZone, type UploadOutcome } from "./upload";
 
@@ -232,16 +233,9 @@ export function Dashboard({
      per-invoice delete, only DELETE /invoices, which empties the whole ledger.
      A row-level bin would have implied a precision that does not exist. */
   const [clearing, setClearing] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
   const [policyOpen, setPolicyOpen] = useState(false);
   async function removeEverything() {
-    if (
-      !confirm(
-        `Remove all ${invoices.length} invoice(s) from this queue AND empty the ` +
-          `accounting system's ledger?\n\nThe accounting system has no way to remove ` +
-          `one registration, so this is all or nothing. It cannot be undone.`,
-      )
-    )
-      return;
     setClearing(true);
     setNotes([]);
     try {
@@ -249,6 +243,7 @@ export function Dashboard({
       await refresh();
     } finally {
       setClearing(false);
+      setConfirmClear(false);
     }
   }
 
@@ -275,6 +270,29 @@ export function Dashboard({
         onClose={() => setPolicyOpen(false)}
         onChanged={refresh}
       />
+      <Confirm
+        open={confirmClear}
+        destructive
+        busy={clearing}
+        title="Remove everything?"
+        confirmLabel="Remove everything"
+        cancelLabel="Keep them"
+        onCancel={() => setConfirmClear(false)}
+        onConfirm={removeEverything}
+        body={
+          <>
+            <p>
+              This clears all <strong>{invoices.length}</strong> invoice
+              {invoices.length === 1 ? "" : "s"} from the inbox <em>and</em> empties the
+              accounting system&rsquo;s ledger.
+            </p>
+            <p>
+              It is all or nothing: the accounting system has no way to withdraw a single
+              registration. This cannot be undone.
+            </p>
+          </>
+        }
+      />
       <div className="pagehead">
         <div className="pagehead-top">
           {/* Names the thing, not the activity -- the review page's heading is
@@ -285,7 +303,11 @@ export function Dashboard({
               Review policy
             </button>
           {!empty && (
-            <button className="btn danger" onClick={removeEverything} disabled={clearing}>
+            <button
+              className="btn danger"
+              onClick={() => setConfirmClear(true)}
+              disabled={clearing}
+            >
               {clearing ? "Removing…" : "Remove all"}
             </button>
           )}

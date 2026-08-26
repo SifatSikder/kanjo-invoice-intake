@@ -556,3 +556,53 @@ input:disabled, select:disabled {
   color: var(--ok); font-size: 13px; line-height: 1.5;
 }
 .settled .raw { color: var(--ok); opacity: 0.8; }
+
+/* -------------------------------------------------------------- modal ----- */
+.modal-scrim {
+  position: fixed; inset: 0; z-index: 80;
+  display: grid; place-items: center; padding: 24px;
+  background: rgba(15, 23, 41, 0.34);
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  animation: fade 0.2s var(--glide);
+}
+.modal {
+  width: min(430px, 100%);
+  padding: 26px 26px 22px;
+  border-radius: var(--r-lg);
+  background: var(--glass-strong);
+  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--shadow-lg), var(--inset-hi);
+  animation: pop 0.32s var(--spring);
+}
+@keyframes pop {
+  from { transform: translateY(10px) scale(0.97); opacity: 0 }
+  to   { transform: none; opacity: 1 }
+}
+.modal-mark {
+  width: 40px; height: 40px; border-radius: 12px; margin-bottom: 14px;
+  display: grid; place-items: center;
+  font-size: 20px; font-weight: 700;
+  background: var(--brand-wash); color: var(--brand);
+}
+.modal-mark.danger { background: var(--err-wash); color: var(--err); }
+.modal h2 {
+  font-size: 17px; font-weight: 640; letter-spacing: -0.3px;
+  text-transform: none; color: var(--ink); margin: 0 0 8px;
+}
+.modal-body { font-size: 13.5px; line-height: 1.6; color: var(--ink-2); }
+.modal-body p { margin: 0 0 9px; }
+.modal-body p:last-child { margin-bottom: 0; }
+.modal-actions {
+  display: flex; gap: 9px; justify-content: flex-end;
+  margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line);
+}
+/* The destructive action looks destructive, and is never the default focus. */
+.btn.destructive {
+  background: linear-gradient(140deg, var(--err), #9f1239);
+  border-color: transparent; color: #fff;
+  box-shadow: 0 4px 16px -4px rgba(225, 29, 72, 0.5), var(--inset-hi);
+}
+.btn.destructive:hover:not(:disabled) {
+  box-shadow: 0 8px 24px -6px rgba(225, 29, 72, 0.58), var(--inset-hi);
+}
