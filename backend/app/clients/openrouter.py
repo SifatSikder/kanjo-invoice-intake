@@ -13,8 +13,10 @@ takes the call rather than the batch dying at month-end.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import random
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -22,6 +24,10 @@ from typing import Any
 import httpx
 
 logger = logging.getLogger(__name__)
+
+
+# Upstream trouble rather than a bad request: worth another attempt.
+RETRYABLE_STATUS = {408, 409, 429, 500, 502, 503, 504}
 
 
 class OpenRouterError(RuntimeError):
@@ -119,15 +125,38 @@ class OpenRouterClient:
                     )
             except (httpx.TimeoutException, httpx.TransportError) as exc:
                 last_error = OpenRouterError(f"network error: {exc}", retryable=True)
-                logger.warning("openrouter transport error (attempt %s): %s", attempt, exc)
+                logger.warning(
+                    "openrouter transport error (attempt %s/%s): %s", attempt, max_attempts, exc
+                )
+                if attempt < max_attempts:
+                    await self._backoff(attempt)
                 continue
 
             latency_ms = int((time.perf_counter() - started) * 1000)
 
             if response.status_code == 200:
                 body = response.json()
+                # OpenRouter reports upstream failures inside a 200 body rather
+                # than as an HTTP status, so a gateway timeout arrives looking
+                # like a successful response. Treating every in-band error as
+                # final made one slow provider a permanently failed invoice.
                 if "error" in body and body["error"]:
-                    raise OpenRouterError(f"model returned an error: {body['error']}")
+                    err = body["error"] if isinstance(body["error"], dict) else {}
+                    code = err.get("code")
+                    message = err.get("message", body["error"])
+                    if code in RETRYABLE_STATUS and attempt < max_attempts:
+                        logger.warning(
+                            "openrouter returned %s in-band (attempt %s/%s): %s",
+                            code, attempt, max_attempts, message,
+                        )
+                        last_error = OpenRouterError(
+                            f"upstream {code}: {message}", status=code, retryable=True
+                        )
+                        await self._backoff(attempt)
+                        continue
+                    raise OpenRouterError(
+                        f"model returned an error: {body['error']}", status=code
+                    )
                 choice = (body.get("choices") or [{}])[0]
                 usage = body.get("usage") or {}
                 return Completion(
@@ -151,7 +180,7 @@ class OpenRouterClient:
                 json_schema = None
                 continue
 
-            retryable = response.status_code in (408, 409, 429, 500, 502, 503, 504)
+            retryable = response.status_code in RETRYABLE_STATUS
             last_error = OpenRouterError(
                 f"HTTP {response.status_code} from OpenRouter: {detail}",
                 status=response.status_code,
@@ -159,6 +188,20 @@ class OpenRouterClient:
             )
             if not retryable:
                 raise last_error
-            logger.warning("openrouter %s (attempt %s)", response.status_code, attempt)
+            logger.warning(
+                "openrouter %s (attempt %s/%s)", response.status_code, attempt, max_attempts
+            )
+            await self._backoff(attempt)
 
         raise last_error or OpenRouterError("exhausted retries")
+
+    @staticmethod
+    async def _backoff(attempt: int) -> None:
+        """Wait before trying again, with jitter.
+
+        Retrying instantly three times is barely a retry: a provider that is
+        briefly overloaded is still overloaded a millisecond later, and a batch
+        of uploads all retrying in lockstep makes it worse. Jitter spreads them.
+        """
+        delay = min(8.0, 0.75 * (2 ** (attempt - 1)))
+        await asyncio.sleep(delay + random.uniform(0, 0.4))

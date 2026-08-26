@@ -422,8 +422,17 @@ async def summarize(session: AsyncSession) -> dict:
     return {status.value: count for status, count in rows.all()}
 
 
-async def load_invoice(session: AsyncSession, invoice_id: int) -> Invoice | None:
-    return await session.scalar(
+async def load_invoice(
+    session: AsyncSession, invoice_id: int, *, fresh: bool = False
+) -> Invoice | None:
+    """Load an invoice with everything the review screen needs.
+
+    Pass fresh=True after writing through this session. The session keeps the
+    object it already has, relationships and all, so an invoice re-read straight
+    after posting comes back with the collection it was loaded with -- reporting
+    no accounting reference for something that just registered.
+    """
+    stmt = (
         select(Invoice)
         .where(Invoice.id == invoice_id)
         .options(
@@ -434,3 +443,6 @@ async def load_invoice(session: AsyncSession, invoice_id: int) -> Invoice | None
             selectinload(Invoice.review_events),
         )
     )
+    if fresh:
+        stmt = stmt.execution_options(populate_existing=True)
+    return await session.scalar(stmt)

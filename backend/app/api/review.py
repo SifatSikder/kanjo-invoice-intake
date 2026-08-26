@@ -20,11 +20,18 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import accounting_client
+from app.api.deps import accounting_client, openrouter_client
 from app.api.invoices import to_detail
 from app.db import get_session
 from app.models import Invoice, InvoiceLine, InvoiceStatus, ReviewEvent
-from app.pipeline.orchestrator import get_partner_master, load_invoice, verify_invoice
+from app.pipeline.orchestrator import (
+    Accepted,
+    get_partner_master,
+    load_invoice,
+    process_accepted,
+    verify_invoice,
+)
+from app.pipeline.render import load_rendered
 from app.pipeline.post import post_invoice
 from app.schemas import InvoiceOut, InvoicePatch
 
@@ -106,7 +113,7 @@ async def patch_invoice(
     ))
     await session.commit()
 
-    invoice = await load_invoice(session, invoice_id)
+    invoice = await load_invoice(session, invoice_id, fresh=True)
     return to_detail(invoice)
 
 
@@ -167,7 +174,7 @@ async def approve_invoice(
     ))
     await session.commit()
 
-    invoice = await load_invoice(session, invoice_id)
+    invoice = await load_invoice(session, invoice_id, fresh=True)
     return to_detail(invoice)
 
 
@@ -193,5 +200,62 @@ async def reject_invoice(
     ))
     await session.commit()
 
+    invoice = await load_invoice(session, invoice_id, fresh=True)
+    return to_detail(invoice)
+
+
+@router.post("/{invoice_id}/retry", response_model=InvoiceOut)
+async def retry_invoice(
+    invoice_id: int, session: AsyncSession = Depends(get_session)
+) -> InvoiceOut:
+    """Read an invoice again after the first attempt failed.
+
+    Extraction can fail for reasons that have nothing to do with the document --
+    a provider timing out, a rate limit, a model briefly unavailable. Without
+    this, one bad minute upstream leaves an invoice permanently stuck, and the
+    only way out is emptying the whole queue.
+
+    The pages are read back from storage, so this costs one model call and does
+    not need the original upload.
+    """
     invoice = await load_invoice(session, invoice_id)
+    if invoice is None:
+        raise HTTPException(404, "invoice not found")
+    if invoice.status is InvoiceStatus.POSTED:
+        raise HTTPException(409, "already registered; nothing to retry")
+
+    document = invoice.document
+    try:
+        rendered = load_rendered(
+            document.storage_path,
+            filename=document.filename,
+            sha256=document.sha256,
+            mime_type=document.mime_type,
+        )
+    except FileNotFoundError:
+        raise HTTPException(
+            410,
+            "the rendered pages for this document are gone; upload the invoice again",
+        )
+
+    accounting = accounting_client()
+    invoice.status = InvoiceStatus.PENDING
+    invoice.notes = None
+    await session.flush()
+
+    await process_accepted(
+        session,
+        Accepted(invoice=invoice, rendered=rendered),
+        openrouter=openrouter_client(),
+        accounting=accounting,
+        master=await get_partner_master(accounting),
+    )
+
+    session.add(ReviewEvent(
+        invoice_id=invoice.id, actor="reviewer", action="retry",
+        note="Read the document again after the previous attempt failed.",
+    ))
+    await session.commit()
+
+    invoice = await load_invoice(session, invoice_id, fresh=True)
     return to_detail(invoice)

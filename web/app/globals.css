@@ -245,6 +245,17 @@ tbody tr:last-child td { border-bottom: none; }
 td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .raw { font-size: 11.5px; color: var(--muted); margin-top: 3px; font-family: var(--mono); }
 
+/* A way back from a failure that was never about the document. */
+.retry {
+  display: block; margin-top: 7px; padding: 4px 10px;
+  border-radius: 7px; border: 1px solid rgba(79, 70, 229, 0.28);
+  background: var(--brand-wash); color: var(--brand);
+  font: inherit; font-size: 12px; font-weight: 560; cursor: pointer;
+  transition: background 0.18s var(--glide), transform 0.18s var(--spring);
+}
+.retry:hover:not(:disabled) { background: rgba(79, 70, 229, 0.14); transform: translateY(-1px); }
+.retry:disabled { opacity: 0.6; cursor: progress; }
+
 /* ---------------------------------------------------------------- pills --- */
 .pill {
   display: inline-flex; align-items: center; gap: 6px;

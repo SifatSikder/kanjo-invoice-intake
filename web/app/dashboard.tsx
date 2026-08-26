@@ -46,8 +46,12 @@ const LABEL: Record<string, string> = {
 };
 
 
-function Row({ i }: { i: Summary }) {
+function Row({ i, onRetried }: { i: Summary; onRetried: () => void }) {
   const router = useRouter();
+  const [retrying, setRetrying] = useState(false);
+  // Extraction can fail for reasons nothing to do with the document. Without a
+  // way back, one slow minute upstream strands an invoice for good.
+  const canRetry = i.status === "EXTRACT_FAILED" || i.status === "POST_FAILED";
   const pending = i.status === "PENDING";
   const href = `/review/${i.id}`;
 
@@ -104,14 +108,36 @@ function Row({ i }: { i: Summary }) {
       <td className="mono">{i.invoice_number ?? "—"}</td>
       <td className="num">{yen(i.total_amount)}</td>
       <td className="mono">{i.accounting_id ?? "—"}</td>
-      <td style={{ color: "var(--muted)", maxWidth: 300 }}>{i.blocking_reason ?? ""}</td>
+      <td style={{ color: "var(--muted)", maxWidth: 300 }}>
+        {i.blocking_reason ?? ""}
+        {canRetry && (
+          <button
+            className="retry"
+            disabled={retrying}
+            onClick={async (e) => {
+              e.stopPropagation();
+              setRetrying(true);
+              try {
+                await fetch(`/api/invoices/${i.id}/retry`, { method: "POST" });
+              } finally {
+                setRetrying(false);
+                onRetried();
+              }
+            }}
+          >
+            {retrying ? "Reading again…" : "Try again"}
+          </button>
+        )}
+      </td>
     </tr>
   );
 }
 
 function Section({
-  title, blurb, rows, index,
-}: { title: string; blurb: string; rows: Summary[]; index: number }) {
+  title, blurb, rows, index, onRetried,
+}: {
+  title: string; blurb: string; rows: Summary[]; index: number; onRetried: () => void;
+}) {
   if (!rows.length) return null;
   return (
     <section className="rise" style={{ ["--i" as string]: index }}>
@@ -136,7 +162,7 @@ function Section({
         </thead>
         <tbody>
           {rows.map((i) => (
-            <Row key={i.id} i={i} />
+            <Row key={i.id} i={i} onRetried={onRetried} />
           ))}
         </tbody>
       </table>

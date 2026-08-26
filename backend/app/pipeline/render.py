@@ -221,3 +221,39 @@ def prepare_document(path: Path, *, storage_dir: Path | None = None) -> Rendered
             (target / "text-layer.txt").write_text(document.text_layer, encoding="utf-8")
 
     return document
+
+
+def load_rendered(
+    storage_path: Path | str,
+    *,
+    filename: str,
+    sha256: str,
+    mime_type: str,
+) -> RenderedDocument:
+    """Rebuild a RenderedDocument from what was written to storage.
+
+    The uploaded file itself is discarded once its pages are rendered -- keeping
+    a second copy of every invoice earns nothing. So retrying an extraction
+    reads the pages back rather than re-rendering a source that is gone.
+    """
+    target = Path(storage_path)
+    pages: list[RenderedPage] = []
+    for index, page_file in enumerate(sorted(target.glob("page-*.jpg")), start=1):
+        data = page_file.read_bytes()
+        with Image.open(io.BytesIO(data)) as probe:
+            width, height = probe.size
+        pages.append(
+            RenderedPage(index, data, "image/jpeg", width, height, str(page_file))
+        )
+    if not pages:
+        raise FileNotFoundError(f"no rendered pages under {target}")
+
+    text_file = target / "text-layer.txt"
+    return RenderedDocument(
+        filename=filename,
+        sha256=sha256,
+        mime_type=mime_type,
+        page_count=len(pages),
+        pages=pages,
+        text_layer=text_file.read_text(encoding="utf-8") if text_file.exists() else "",
+    )
