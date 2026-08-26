@@ -18,7 +18,7 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clients.accounting import AccountingClient, ApiResult
-from app.models import Invoice, InvoiceStatus, Posting
+from app.models import CheckResult, Invoice, InvoiceStatus, Posting, Severity
 from app.pipeline.normalize import FALLBACK_UNIT, expected_tax_by_code
 from app.schemas import AccountingLine, AccountingPayload
 
@@ -134,6 +134,13 @@ async def post_invoice(
         return posting
 
     # --- rejection -----------------------------------------------------------
+    # The accounting system refusing an invoice is a verification failure like
+    # any other -- it just happened one step further downstream. Recording it as
+    # a check means the queue, the review screen and the audit trail all learn
+    # about it through the path they already use, instead of the reason living
+    # only in a notes column that nothing displays.
+    _record_rejection(invoice, result)
+
     posting = Posting(
         invoice_id=invoice.id, attempt=attempt, request_payload=body,
         response_status=result.status, response_body=result.body,
@@ -154,3 +161,29 @@ async def post_invoice(
 
     session.add(posting)
     return posting
+
+
+# Rejections that mean "never postable as-is" rather than "a human should look".
+_BLOCKING_ERRORS = {"DUPLICATE_INVOICE", "PARTNER_NOT_FOUND"}
+
+
+def _record_rejection(invoice: Invoice, result: ApiResult) -> None:
+    """Turn an API refusal into a failed check, so it surfaces like the rest."""
+    code = result.error_code or "REJECTED"
+    severity = Severity.BLOCKER if code in _BLOCKING_ERRORS else Severity.ERROR
+
+    # Replace any earlier verdict for this check so a retry does not stack up.
+    invoice.checks[:] = [c for c in invoice.checks if c.name != "accounting.accepted"]
+    invoice.checks.append(
+        CheckResult(
+            name="accounting.accepted",
+            severity=severity,
+            passed=False,
+            message=result.error_message or f"The accounting system refused this ({code})",
+            detail={
+                "error_code": code,
+                "http_status": result.status,
+                "details": result.error_details,
+            },
+        )
+    )

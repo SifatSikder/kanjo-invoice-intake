@@ -118,6 +118,13 @@ const FAILED: Record<string, Copy> = {
     title: "This invoice is above the amount that can be approved automatically",
     action: "Nothing is wrong with it. It needs a person to sign off because of its size.",
   },
+  "accounting.accepted": {
+    title: "The accounting system refused this invoice",
+    action:
+      "This came back from the accounting system itself, after our own checks passed. " +
+      "If the number is already taken there, ask the supplier to reissue with a new one; " +
+      "otherwise correct the details and try again.",
+  },
 };
 
 const PASSED: Record<string, string> = {
@@ -141,6 +148,7 @@ const PASSED: Record<string, string> = {
   "handwriting.detected": "No handwriting on this invoice",
   "handwriting.on_payment_details": "Payment details are untouched",
   "amount.threshold": "Within the automatic approval limit",
+  "accounting.accepted": "The accounting system accepted it",
 };
 
 export function describe(check: Check): Copy & { detail: string } {

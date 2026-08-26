@@ -37,6 +37,13 @@ _QUEUE_ORDER = {
 def to_summary(invoice: Invoice) -> InvoiceSummary:
     accounting_id = next((p.accounting_id for p in invoice.postings if p.succeeded), None)
     failed = [c for c in invoice.checks if not c.passed and c.severity.value in ("BLOCKER", "ERROR")]
+    # If something stopped this invoice, the queue has to say what. `notes`
+    # carries reasons that arrived after the checks ran -- an extraction that
+    # failed, an accounting system that refused -- and a blank "what's wrong"
+    # column on a blocked row is the silent failure this whole pipeline exists
+    # to prevent.
+    stopped = invoice.status.value in ("BLOCKED", "POST_FAILED", "EXTRACT_FAILED")
+    reason = failed[0].message if failed else (invoice.notes if stopped else None)
     return InvoiceSummary(
         id=invoice.id,
         status=invoice.status.value,
@@ -47,7 +54,7 @@ def to_summary(invoice: Invoice) -> InvoiceSummary:
         issue_date=invoice.issue_date,
         total_amount=invoice.total_amount,
         accounting_id=accounting_id,
-        blocking_reason=failed[0].message if failed else None,
+        blocking_reason=reason,
         failed_checks=len(failed),
     )
 
