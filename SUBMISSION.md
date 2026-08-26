@@ -7,6 +7,20 @@
   OpenRouter key), then `docker compose up --build`. Open <http://localhost:3000>
   and drop an invoice on it. Full instructions in `README.md`; a step-by-step
   walkthrough of every case in `docs/TESTING_GUIDE.pdf`.
+- Demo video: **[Watch on Google Drive](https://drive.google.com/file/d/1rI-9x5RQu2wWAwxh0JWY6-dal-bco6wj/view?usp=sharing)** (7 min 33 s). The brief asks for three
+  minutes. Mine runs longer because I walk through every verification outcome
+  rather than one, and I would rather you skip than have me leave a case out.
+  If you have three minutes, these are the ones that matter:
+
+  | Time | What it shows |
+  |---|---|
+  | 1:45 | Twelve invoices dropped in at once. Uploading is the only way in — there is no folder the system watches. |
+  | 2:30 | **The duplicate.** `invoice_07` is `invoice_01` arriving a second time as a scan. It is blocked against the posting it would have repeated — this is the near-miss the client described, caught before payment. |
+  | 2:45 | **Unknown supplier.** 新星ロジスティクス is not in the partner master, so the invoice is blocked. The machine is never allowed to create a payee. |
+  | 4:00 | **The supplier's own paperwork disagrees with itself** — the printed total does not match the sum of its line items. The recalculated figure is what gets filed, and the discrepancy is recorded against the posting. |
+  | 4:30 | **Bank details altered by hand.** The payment-diversion case: held for a person, with the phone call they made recorded before anything is approved. |
+  | 6:00 | Where it lands — 8 filed unattended, 67% handled without a person, five cents of model spend across all twelve. |
+  | 6:15 | The thresholds behind every decision above, editable by the client rather than buried in my config. |
 
 ## 1. Understanding the request
 

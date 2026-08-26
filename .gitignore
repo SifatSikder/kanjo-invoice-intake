@@ -15,3 +15,7 @@ storage/
 *.egg-info/
 .pytest_cache/
 .playwright-mcp/
+
+# Screen recording — hosted, not committed
+*.mov
+*.mp4
