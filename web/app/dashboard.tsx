@@ -70,7 +70,12 @@ function TrashIcon() {
   );
 }
 
-function Row({ i, onDeleted }: { i: Summary; onDeleted: () => void }) {
+function Row({
+  i, onDeleted,
+}: {
+  i: Summary;
+  onDeleted: (failure?: { filename: string; reason: string }) => void;
+}) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const pending = i.status === "PENDING";
@@ -147,9 +152,25 @@ function Row({ i, onDeleted }: { i: Summary; onDeleted: () => void }) {
             setDeleting(true);
             try {
               const res = await fetch(`/api/invoices/${i.id}`, { method: "DELETE" });
-              if (!res.ok) throw new Error(String(res.status));
-              onDeleted();
-            } catch {
+              // 404 means it is already gone, which is what was asked for.
+              // Refreshing clears the stale row rather than leaving it sitting
+              // there looking undeletable.
+              if (res.ok || res.status === 404) {
+                onDeleted();
+              } else {
+                onDeleted({
+                  filename: i.filename,
+                  reason: `could not be removed (the server said ${res.status})`,
+                });
+              }
+            } catch (e) {
+              onDeleted({
+                filename: i.filename,
+                reason: `could not be removed: ${e instanceof Error ? e.message : e}`,
+              });
+            } finally {
+              // Unconditional: normally the row unmounts and this is moot, but
+              // if it survives the refresh the button must not stay spinning.
               setDeleting(false);
             }
           }}
@@ -164,7 +185,11 @@ function Row({ i, onDeleted }: { i: Summary; onDeleted: () => void }) {
 function Section({
   title, blurb, rows, index, onDeleted,
 }: {
-  title: string; blurb: string; rows: Summary[]; index: number; onDeleted: () => void;
+  title: string;
+  blurb: string;
+  rows: Summary[];
+  index: number;
+  onDeleted: (failure?: { filename: string; reason: string }) => void;
 }) {
   if (!rows.length) return null;
   return (
@@ -235,6 +260,16 @@ export function Dashboard({
       if (timer.current) clearTimeout(timer.current);
     };
   }, [working, invoices, refresh]);
+
+  /* A delete that fails must say so. Silently resetting the spinner leaves the
+     row sitting there looking broken, with nothing to act on. */
+  const onRemoved = useCallback(
+    (failure?: { filename: string; reason: string }) => {
+      setNotes(failure ? [{ filename: failure.filename, reason: failure.reason }] : []);
+      refresh();
+    },
+    [refresh],
+  );
 
   const onUploaded = useCallback(
     (outcome: UploadOutcome) => {
@@ -351,7 +386,7 @@ export function Dashboard({
             title={g.title}
             blurb={g.blurb}
             rows={g.rows}
-            onDeleted={refresh}
+            onDeleted={onRemoved}
           />
         ))}
     </>
