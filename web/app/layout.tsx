@@ -25,7 +25,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span className="jp">勘定</span>
             </Link>
             <span className="spacer" />
-            <span className="env">invoice intake</span>
           </div>
         </header>
         {children}

@@ -177,22 +177,20 @@ export function Dashboard({
 
   return (
     <>
-      <div className="topbar">
-        <div>
+      <div className="pagehead">
+        <div className="pagehead-top">
           <h1>Invoice intake</h1>
-          <p className="sub">
-            Upload a supplier invoice. It is read, checked against the accounting
-            system&rsquo;s own rules, and registered automatically when every check passes.
-            Anything that cannot be verified stops here for you.
-          </p>
-        </div>
-        {!empty && (
-          <div className="actions">
+          {!empty && (
             <button className="btn danger" onClick={reset}>
               Clear all
             </button>
-          </div>
-        )}
+          )}
+        </div>
+        <p className="sub">
+          Upload a supplier invoice. It is read, checked against the accounting
+          system&rsquo;s own rules, and registered automatically when every check passes.
+          Anything that cannot be verified stops here for you.
+        </p>
       </div>
 
       <div style={{ marginTop: 18 }}>

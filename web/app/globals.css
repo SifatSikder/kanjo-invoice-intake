@@ -147,11 +147,6 @@ a:hover { color: var(--brand-2); }
 .wordmark { font-size: 17px; font-weight: 650; letter-spacing: -0.35px; }
 .wordmark .jp { color: var(--muted); font-weight: 500; margin-left: 7px; font-size: 13.5px; }
 .masthead .spacer { flex: 1; }
-.masthead .env {
-  font-family: var(--mono); font-size: 11px; color: var(--muted);
-  padding: 4px 9px; border-radius: 999px;
-  background: var(--glass); border: 1px solid var(--line);
-}
 
 /* ---------------------------------------------------------------- type ---- */
 h1 { font-size: 27px; font-weight: 660; letter-spacing: -0.7px; margin: 0 0 6px; }
@@ -159,7 +154,7 @@ h2 {
   font-size: 12px; font-weight: 660; letter-spacing: 0.09em; text-transform: uppercase;
   color: var(--muted); margin: 34px 0 4px;
 }
-.sub { color: var(--ink-2); font-size: 14.5px; margin: 0; max-width: 74ch; }
+.sub { color: var(--ink-2); font-size: 14.5px; margin: 0; }
 .mono { font-family: var(--mono); font-size: 12.5px; }
 .note { font-size: 13px; color: var(--muted); margin-top: 12px; line-height: 1.6; }
 .err-text { color: var(--err); }
@@ -348,6 +343,15 @@ tr.pending td:first-child::after {
   display: flex; align-items: flex-start; justify-content: space-between;
   gap: 20px; flex-wrap: wrap; margin-bottom: 4px;
 }
+
+/* Title and its actions share a row; the description gets the whole column
+   underneath, so it is not squeezed into a flex child. */
+.pagehead { margin-bottom: 4px; }
+.pagehead-top {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 20px; flex-wrap: wrap;
+}
+.pagehead .sub { margin-top: 2px; }
 
 /* -------------------------------------------------------------- review ---- */
 .split { display: grid; grid-template-columns: minmax(0, 0.92fr) minmax(0, 1fr); gap: 22px; align-items: start; }
