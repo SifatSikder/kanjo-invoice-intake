@@ -113,6 +113,10 @@ class OpenRouterClient:
                 "json_schema": {"name": "invoice", "strict": True, "schema": json_schema},
             }
 
+        # Remembered separately: the json_schema local is cleared when a model
+        # rejects strict mode, but we still expect JSON back either way.
+        wanted_json = json_schema is not None
+
         last_error: Exception | None = None
         for attempt in range(1, max_attempts + 1):
             started = time.perf_counter()
@@ -159,7 +163,7 @@ class OpenRouterClient:
                     )
                 choice = (body.get("choices") or [{}])[0]
                 usage = body.get("usage") or {}
-                return Completion(
+                completion = Completion(
                     text=(choice.get("message") or {}).get("content") or "",
                     model=body.get("model", model),
                     prompt_tokens=usage.get("prompt_tokens", 0),
@@ -169,6 +173,33 @@ class OpenRouterClient:
                     finish_reason=choice.get("finish_reason"),
                     raw=body,
                 )
+
+                # A structured answer that will not parse is unusable, and the
+                # cause is usually a generation that stopped mid-string rather
+                # than anything wrong with the request. Checking here means one
+                # bad generation costs a retry instead of the whole invoice.
+                if wanted_json:
+                    try:
+                        completion.json()
+                    except (ValueError, IndexError):
+                        if attempt < max_attempts:
+                            logger.warning(
+                                "unparseable JSON from %s (attempt %s/%s, finish_reason=%s): %.120s",
+                                model, attempt, max_attempts,
+                                completion.finish_reason, completion.text,
+                            )
+                            last_error = OpenRouterError(
+                                "model returned unparseable JSON", retryable=True
+                            )
+                            await self._backoff(attempt)
+                            continue
+                        raise OpenRouterError(
+                            "model returned unparseable JSON after "
+                            f"{max_attempts} attempts (finish_reason="
+                            f"{completion.finish_reason})"
+                        )
+
+                return completion
 
             detail = response.text[:400]
             # Some models reject strict json_schema. Degrade to plain JSON mode

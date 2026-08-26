@@ -20,13 +20,19 @@ async function proxy(request: Request, path: string[]) {
   // even where GET works. Fetch with GET and return the headers without a body,
   // which is what HEAD is supposed to mean.
   const isHead = request.method === "HEAD";
-  const init: RequestInit = {
+  const init: RequestInit & { duplex?: "half" } = {
     method: isHead ? "GET" : request.method,
     headers: { "Content-Type": request.headers.get("content-type") || "application/json" },
     cache: "no-store",
   };
   if (!["GET", "HEAD"].includes(request.method)) {
-    init.body = await request.text();
+    // Stream the body through byte for byte. Reading it as text decodes it as
+    // UTF-8, so every byte that is not valid UTF-8 becomes U+FFFD and the
+    // re-encoded result is garbage -- which destroys a JPEG outright and leaves
+    // a PDF structurally intact but with its content streams shredded. Uploads
+    // are the only binary traffic here, and that is exactly what it broke.
+    init.body = request.body;
+    init.duplex = "half"; // required when a stream is used as a request body
   }
 
   try {

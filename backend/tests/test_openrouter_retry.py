@@ -96,3 +96,28 @@ async def test_giving_up_reports_the_upstream_reason(monkeypatch, client):
         await client.complete(model="m", messages=[], max_attempts=3)
     assert "503" in str(exc.value) or "no capacity" in str(exc.value)
     assert calls["n"] == 3
+
+
+async def test_a_generation_that_stops_mid_string_is_retried(monkeypatch, client):
+    """A truncated answer is unusable, but the next one usually is not."""
+    calls = patch_transport(monkeypatch, [
+        FakeResponse(ok_body('{"invoice_number": "YM-2026')),   # cut off
+        FakeResponse(ok_body()),
+    ])
+    result = await client.complete(model="m", messages=[], json_schema={"type": "object"})
+    assert result.json() == {"invoice_number": "X"}
+    assert calls["n"] == 2
+
+
+async def test_unparseable_json_eventually_gives_up_with_a_clear_reason(monkeypatch, client):
+    patch_transport(monkeypatch, [FakeResponse(ok_body("not json at all"))])
+    with pytest.raises(OpenRouterError, match="unparseable JSON"):
+        await client.complete(model="m", messages=[], json_schema={"type": "object"})
+
+
+async def test_a_plain_text_call_is_not_held_to_json(monkeypatch, client):
+    """Only calls that asked for a schema are checked for parseability."""
+    calls = patch_transport(monkeypatch, [FakeResponse(ok_body("just prose"))])
+    result = await client.complete(model="m", messages=[])
+    assert result.text == "just prose"
+    assert calls["n"] == 1
